@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<title>Habits</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<style>
+  :root { --bg:#0f1115; --card:#181b22; --line:#262a33; --text:#e8eaed; --muted:#8b93a1; --accent:#34d399; --warn:#f59e0b; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+  main { max-width: 520px; margin: 0 auto; padding: 16px 16px calc(88px + env(safe-area-inset-bottom)); }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  h2 { font-size: 1rem; color: var(--muted); font-weight: 600; margin: 24px 0 8px; }
+
+  nav { position: fixed; inset: auto 0 0 0; display: flex; background: var(--card); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
+  nav button { flex: 1; background: none; border: 0; padding: 14px 0; color: var(--muted); font-weight: 600; }
+  nav button.on { color: var(--accent); }
+
+  .day { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .day > button { width: 48px; height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); font-size: 1.6rem; line-height: 1; }
+  .day > button:disabled { opacity: .3; }
+  .day .date { text-align: center; font-weight: 700; font-size: 1.15rem; }
+  .day .score { text-align: center; color: var(--accent); font-weight: 700; font-size: 1.6rem; }
+
+  .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .list.paused { opacity: .4; }
+  .habit { width: 100%; min-height: 60px; display: flex; align-items: center; gap: 14px; text-align: left; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--card); }
+  .habit .box { flex: none; width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--muted); display: grid; place-items: center; font-weight: 800; color: var(--bg); }
+  .habit.done .box { background: var(--accent); border-color: var(--accent); }
+  .habit.done .name { color: var(--muted); }
+  .habit.met:not(.done) { opacity: .55; }
+  .txt { display: flex; flex-direction: column; }
+  .note { font-size: .85rem; color: var(--muted); }
+  .empty { color: var(--muted); padding: 24px 0; text-align: center; }
+
+  .ghost, .btn { margin-top: 16px; width: 100%; padding: 12px; border-radius: 12px; border: 1px dashed var(--line); background: none; color: var(--muted); }
+  .btn { border-style: solid; background: var(--card); color: var(--text); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 700; }
+  .banner { width: 100%; padding: 10px 12px; margin-bottom: 12px; border-radius: 12px; border: 1px solid var(--warn); background: none; color: var(--warn); text-align: left; }
+
+  .heat { display: grid; grid-template-rows: repeat(7, 1fr); grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; }
+  .heat b { font-size: .7rem; color: var(--muted); font-weight: 500; display: grid; place-items: center; }
+  .cell { aspect-ratio: 1; border-radius: 4px; background: rgb(52 211 153 / calc(.08 + var(--r, 0) * .92)); }
+  .cell.future { background: none; }
+  .cell.pause { background: repeating-linear-gradient(45deg, #2a2e37 0 3px, #1c1f26 3px 6px); }
+  .cell.today { outline: 2px solid var(--text); outline-offset: 1px; }
+
+  table { width: 100%; border-collapse: collapse; }
+  td, th { padding: 10px 4px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+  td:first-child, th:first-child { text-align: left; white-space: normal; }
+  th { color: var(--muted); font-weight: 500; font-size: .85rem; }
+
+  .row { display: flex; align-items: center; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .row .txt { flex: 1; min-width: 0; }
+  .row button { min-width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); padding: 0 10px; }
+  .row button:disabled { opacity: .3; }
+  form { display: grid; gap: 10px; padding: 14px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); }
+  label { display: grid; gap: 4px; font-size: .85rem; color: var(--muted); }
+  input, select { padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+  form .btns { display: flex; gap: 8px; }
+  form .btns .btn { margin: 0; }
+  .muted { color: var(--muted); font-size: .85rem; }
+</style>
+</head>
+<body>
+<main id="view"></main>
+<nav>
+  <button data-tab="today">Today</button>
+  <button data-tab="stats">Stats</button>
+  <button data-tab="settings">Settings</button>
+</nav>
+<input type="file" id="importFile" accept="application/json,.json" hidden>
+<script src="logic.js"></script>
+<script>
+const L = HabitLogic;
+const KEY = 'habits-v1';
+const today = () => L.dayKey(new Date());
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+let data = load();
+let tab = 'today';
+let viewDay = today();
+let lastToday = viewDay;
+let editing = null; // null | 'new' | habit id
+let persisted = null;
+
+function load() {
+  const raw = localStorage.getItem(KEY);
+  if (raw) {
+    try { const d = JSON.parse(raw); if (L.validate(d)) return d; } catch (e) {}
+    // never overwrite unreadable data: keep a copy aside
+    localStorage.setItem(KEY + '-corrupt-' + Date.now(), raw);
+    alert('Saved data could not be read. A copy was kept. Starting fresh — import a backup in Settings.');
+  }
+  const d = L.defaultData(today());
+  localStorage.setItem(KEY, JSON.stringify(d));
+  return d;
+}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(data)); }
+  catch (e) { alert('Could not save: ' + e.message + '. Export a backup now.'); }
+}
+
+function label(key) {
+  const [y, m, d] = key.split('-').map(Number);
+  const s = new Date(y, m - 1, d).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+  const t = today();
+  return key === t ? `Today · ${s}` : key === L.addDays(t, -1) ? `Yesterday · ${s}` : s;
+}
+const freqText = f => f.kind === 'daily' ? 'Daily' : `${f.times}× per week`;
+
+function renderToday() {
+  const t = today();
+  if (viewDay > t) viewDay = t;
+  const paused = L.isPaused(data, viewDay);
+  const habits = data.habits.filter(h => !h.archived && h.created <= viewDay);
+  const s = L.dayScore(data, viewDay);
+  // nag only after 7 days without a backup (counted from first habit if never exported)
+  const since = data.lastExport || data.habits.reduce((m, h) => h.created < m ? h.created : m, t);
+  const needBackup = since < L.addDays(t, -7);
+  return `
+    ${needBackup ? `<button class="banner" data-act="export">Back up your data — tap to export</button>` : ''}
+    <header class="day">
+      <button data-act="prev" aria-label="Previous day">‹</button>
+      <div><div class="date">${label(viewDay)}</div><div class="score">${paused ? 'Paused' : `${s.done}/${s.total}`}</div></div>
+      <button data-act="next" aria-label="Next day" ${viewDay >= t ? 'disabled' : ''}>›</button>
+    </header>
+    <ul class="list ${paused ? 'paused' : ''}">
+      ${habits.map(h => {
+        const done = L.isDone(data, h.id, viewDay);
+        const weekly = h.freq.kind === 'weekly';
+        const sub = [h.note, weekly ? `${L.weekCount(data, h, viewDay)}/${h.freq.times} this week` : ''].filter(Boolean).join(' · ');
+        return `<li><button class="habit ${done ? 'done' : ''} ${weekly && !L.isDue(data, h, viewDay) ? 'met' : ''}"
+          data-act="toggle" data-id="${esc(h.id)}" aria-pressed="${done}" ${paused ? 'disabled' : ''}>
+          <span class="box">${done ? '✓' : ''}</span>
+          <span class="txt"><span class="name">${esc(h.name)}</span>${sub ? `<span class="note">${esc(sub)}</span>` : ''}</span>
+        </button></li>`;
+      }).join('') || '<li class="empty">No habits for this day. Add some in Settings.</li>'}
+    </ul>
+    <button class="ghost" data-act="pause">${paused ? 'Unpause this day' : 'Pause this day (sick, holiday…)'}</button>`;
+}
+
+function renderStats() {
+  const t = today();
+  const start = L.addDays(L.weekStart(t), -7 * 11);
+  let cells = ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(d => `<b>${d}</b>`).join('');
+  for (let i = 0; i < 84; i++) {
+    const k = L.addDays(start, i);
+    const cls = k === t ? ' today' : '';
+    if (k > t) cells += '<i class="cell future"></i>';
+    else if (L.isPaused(data, k)) cells += `<i class="cell pause${cls}" title="${k} · paused"></i>`;
+    else {
+      const s = L.dayScore(data, k);
+      cells += `<i class="cell${cls}" style="--r:${s.total ? s.done / s.total : 0}" title="${k} · ${s.done}/${s.total}"></i>`;
+    }
+  }
+  const pct = p => p == null ? '—' : p + '%';
+  const rows = data.habits.filter(h => !h.archived).map(h =>
+    `<tr><td>${esc(h.name)}<div class="muted">${freqText(h.freq)}</div></td><td>🔥 ${L.streak(data, h, t)}</td><td>${pct(L.percent(data, h, t, 7))}</td><td>${pct(L.percent(data, h, t, 30))}</td></tr>`).join('');
+  return `
+    <h2>Last 12 weeks</h2>
+    <div class="heat">${cells}</div>
+    <h2>Habits</h2>
+    <table><tr><th>Habit</th><th>Streak</th><th>7 d</th><th>30 d</th></tr>${rows}</table>
+    <p class="muted">Streak counts days (or weeks for weekly habits) in a row. Paused days are skipped. Today doesn't count against you until it's over.</p>`;
+}
+
+function renderSettings() {
+  const active = data.habits.filter(h => !h.archived);
+  const archived = data.habits.filter(h => h.archived);
+  const e = editing === 'new' ? { name: '', note: '', freq: { kind: 'daily' } } : data.habits.find(h => h.id === editing);
+  const fv = e && (e.freq.kind === 'daily' ? 'daily' : 'w' + e.freq.times);
+  const opts = [['daily', 'Daily'], ...[1, 2, 3, 4, 5, 6].map(n => ['w' + n, `${n}× per week`])]
+    .map(([v, t]) => `<option value="${v}" ${v === fv ? 'selected' : ''}>${t}</option>`).join('');
+  const row = (h, i, list) => `<div class="row">
+      <span class="txt"><span class="name">${esc(h.name)}</span><span class="note">${esc([freqText(h.freq), h.note].filter(Boolean).join(' · '))}</span></span>
+      ${h.archived ? `<button data-act="archive" data-id="${esc(h.id)}">Restore</button>` : `
+        <button data-act="up" data-id="${esc(h.id)}" aria-label="Move up" ${i === 0 ? 'disabled' : ''}>↑</button>
+        <button data-act="down" data-id="${esc(h.id)}" aria-label="Move down" ${i === list.length - 1 ? 'disabled' : ''}>↓</button>
+        <button data-act="edit" data-id="${esc(h.id)}">Edit</button>
+        <button data-act="archive" data-id="${esc(h.id)}">Archive</button>`}
+    </div>`;
+  return `
+    <h2>Habits</h2>
+    ${e ? `<form id="hform">
+      <label>Name <input name="name" required maxlength="60" value="${esc(e.name)}" autocomplete="off"></label>
+      <label>What counts as done (optional) <input name="note" maxlength="60" value="${esc(e.note)}" placeholder="e.g. 5 g, 7+ h" autocomplete="off"></label>
+      <label>How often <select name="freq">${opts}</select></label>
+      <div class="btns"><button class="btn primary" type="submit">${editing === 'new' ? 'Add habit' : 'Save'}</button><button class="btn" type="button" data-act="cancel">Cancel</button></div>
+    </form>` : `<button class="btn" data-act="new">+ Add habit</button>`}
+    ${active.map(row).join('') || '<p class="muted">No active habits.</p>'}
+    ${archived.length ? `<h2>Archived (history kept)</h2>${archived.map(row).join('')}` : ''}
+    <h2>Backup</h2>
+    <p class="muted">Your data lives only on this phone. Last backup: ${data.lastExport ? label(data.lastExport) : 'never'}.
+      ${persisted === true ? 'Storage is persistent.' : persisted === false ? 'The browser may clear storage when space runs low — export regularly.' : ''}</p>
+    <button class="btn" data-act="export">Export backup (.json)</button>
+    <button class="btn" data-act="import">Import backup</button>`;
+}
+
+function render() {
+  document.getElementById('view').innerHTML = tab === 'today' ? renderToday() : tab === 'stats' ? renderStats() : renderSettings();
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+  const name = document.querySelector('#hform input[name=name]');
+  if (name && !name.value) name.focus();
+}
+
+function move(id, dir) {
+  const idx = data.habits.findIndex(h => h.id === id);
+  let j = idx + dir;
+  while (j >= 0 && j < data.habits.length && data.habits[j].archived) j += dir; // skip archived
+  if (j < 0 || j >= data.habits.length) return;
+  [data.habits[idx], data.habits[j]] = [data.habits[j], data.habits[idx]];
+}
+
+function exportData() {
+  data.lastExport = today();
+  save();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+  a.download = `habits-${today()}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+document.addEventListener('click', ev => {
+  const b = ev.target.closest('button');
+  if (!b) return;
+  if (b.dataset.tab) { tab = b.dataset.tab; editing = null; if (tab === 'today') viewDay = today(); return render(); }
+  const id = b.dataset.id;
+  const h = data.habits.find(x => x.id === id);
+  switch (b.dataset.act) {
+    case 'prev': viewDay = L.addDays(viewDay, -1); break;
+    case 'next': if (viewDay < today()) viewDay = L.addDays(viewDay, 1); break;
+    case 'toggle': L.toggle(data, id, viewDay); save(); break;
+    case 'pause': L.togglePause(data, viewDay); save(); break;
+    case 'new': editing = 'new'; break;
+    case 'edit': editing = id; break;
+    case 'cancel': editing = null; break;
+    case 'up': move(id, -1); save(); break;
+    case 'down': move(id, 1); save(); break;
+    case 'archive': if (h) { h.archived = !h.archived; if (editing === id) editing = null; save(); } break;
+    case 'export': exportData(); break;
+    case 'import': document.getElementById('importFile').click(); return;
+    default: return;
+  }
+  render();
+});
+
+document.addEventListener('submit', ev => {
+  ev.preventDefault();
+  const f = new FormData(ev.target);
+  const name = String(f.get('name')).trim();
+  if (!name) return;
+  const fv = String(f.get('freq'));
+  const freq = fv === 'daily' ? { kind: 'daily' } : { kind: 'weekly', times: Number(fv.slice(1)) };
+  const note = String(f.get('note')).trim();
+  if (editing === 'new') data.habits.push({ id: L.newId(), name, note, type: 'check', freq, created: today(), archived: false });
+  else Object.assign(data.habits.find(h => h.id === editing), { name, note, freq });
+  editing = null;
+  save();
+  render();
+});
+
+document.getElementById('importFile').addEventListener('change', async ev => {
+  const file = ev.target.files[0];
+  ev.target.value = '';
+  if (!file) return;
+  let obj;
+  try { obj = JSON.parse(await file.text()); } catch (e) { return alert('That file is not valid JSON.'); }
+  if (!L.validate(obj)) return alert('That file is not a Habits backup. Nothing was changed.');
+  const days = Object.keys(obj.log).length;
+  if (!confirm(`Replace all current data with this backup (${obj.habits.length} habits, ${days} logged days)?`)) return;
+  data = obj;
+  save();
+  render();
+});
+
+// "today" moves at 04:00 even if the app stayed open
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  const t = today();
+  if (t !== lastToday) { if (viewDay === lastToday) viewDay = t; lastToday = t; }
+  render();
+});
+
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().then(ok => { persisted = ok; if (tab === 'settings') render(); });
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+render();
+</script>
+</body>
+</html>
