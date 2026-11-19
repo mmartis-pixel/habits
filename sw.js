@@ -1,6 +1,6 @@
 // Offline cache. Stale-while-revalidate: opens instantly from cache, fetches updates in the background
 // (new version shows on the next open). Bump CACHE when the file list changes.
-const CACHE = 'habits-v1';
+const CACHE = 'habits-v2';
 const FILES = ['./', 'index.html', 'logic.js', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -14,7 +14,8 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
+  // only cache our own files — never GitHub API (sync must always see fresh data)
+  if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
   e.respondWith(caches.open(CACHE).then(async c => {
     const cached = await c.match(e.request, { ignoreSearch: true });
     const fresh = fetch(e.request).then(r => { if (r.ok) c.put(e.request, r.clone()); return r; }).catch(() => cached);

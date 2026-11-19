@@ -113,4 +113,52 @@ assert.ok(L.validate(L.defaultData(T)));
 assert.strictEqual(L.defaultData(T).habits.length, 6);
 assert.notStrictEqual(L.newId(), L.newId());
 
+// --- toggles leave timestamps (needed for sync) ---
+{
+  const d = data([daily()]);
+  L.toggle(d, 'd', T, 111);
+  assert.strictEqual(d.stamps[`${T}|d`], 111);
+  L.togglePause(d, T, 222);
+  assert.strictEqual(d.stamps[`${T}|pause`], 222);
+}
+
+// --- merge (two devices) ---
+{
+  const base = () => data([daily()]);
+  // tick on one device only -> kept
+  let a = base(), b = base();
+  L.toggle(a, 'd', T, 10);
+  assert.ok(L.isDone(L.merge(a, b), 'd', T));
+  assert.ok(L.isDone(L.merge(b, a), 'd', T));
+  // newer untick beats older tick
+  a = base(); b = base();
+  L.toggle(b, 'd', T, 10);
+  L.toggle(a, 'd', T, 5); L.toggle(a, 'd', T, 20); // ticked then unticked at 20
+  assert.ok(!L.isDone(L.merge(a, b), 'd', T));
+  assert.ok(!L.isDone(L.merge(b, a), 'd', T));
+  // newer tick beats older untick
+  L.toggle(b, 'd', T, 30); L.toggle(b, 'd', T, 31); // b: unticked at 30, ticked again at 31
+  assert.ok(L.isDone(L.merge(a, b), 'd', T));
+  // no stamps (old data) -> union
+  a = data([daily()], { d: ['2026-11-17'] });
+  b = data([daily()], { d: ['2026-11-18'] });
+  const u = L.merge(a, b);
+  assert.ok(L.isDone(u, 'd', '2026-11-17') && L.isDone(u, 'd', '2026-11-18'));
+  // pauses merge too
+  a = base(); b = base();
+  L.togglePause(b, T, 50);
+  assert.ok(L.isPaused(L.merge(a, b), T));
+  // habits: newer edit wins, habits from both sides kept, lastExport = latest
+  a = base(); b = base();
+  b.habits[0] = { ...b.habits[0], name: 'Renamed', updated: 100 };
+  b.habits.push({ ...weekly(2), updated: 90 });
+  a.lastExport = '2026-11-18'; b.lastExport = '2026-11-10';
+  const m = L.merge(a, b);
+  assert.deepStrictEqual(m.habits.map(h => h.name), ['Renamed', 'W']);
+  assert.strictEqual(m.lastExport, '2026-11-18');
+  // merging a result with itself changes nothing
+  assert.deepStrictEqual(L.merge(m, m), m);
+  assert.ok(L.validate(m));
+}
+
 console.log('all tests passed');

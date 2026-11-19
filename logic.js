@@ -17,13 +17,49 @@
   const isDone = (data, id, key) => (data.log[key] || []).includes(id);
   const isPaused = (data, key) => data.pauses.includes(key);
 
-  function toggle(data, id, key) {
+  // every toggle stamps its cell ('day|habitId' or 'day|pause') so two devices can merge (newer wins)
+  const stamp = (data, cell, now) => { (data.stamps = data.stamps || {})[cell] = now; };
+
+  function toggle(data, id, key, now = Date.now()) {
     const day = data.log[key] || [];
     data.log[key] = day.includes(id) ? day.filter(x => x !== id) : [...day, id];
     if (!data.log[key].length) delete data.log[key];
+    stamp(data, `${key}|${id}`, now);
   }
-  function togglePause(data, key) {
+  function togglePause(data, key, now = Date.now()) {
     data.pauses = isPaused(data, key) ? data.pauses.filter(k => k !== key) : [...data.pauses, key];
+    stamp(data, `${key}|pause`, now);
+  }
+
+  // Merge two copies of the data (phone + computer). Cells: newer stamp wins, no stamps = union.
+  // Habits: newer `updated` wins per id; order from the side edited most recently.
+  function merge(a, b) {
+    const newest = d => d.habits.reduce((m, h) => Math.max(m, h.updated || 0), 0);
+    const [first, second] = newest(a) >= newest(b) ? [a, b] : [b, a];
+    const byId = new Map();
+    for (const h of [...first.habits, ...second.habits]) {
+      const cur = byId.get(h.id);
+      if (!cur || (h.updated || 0) > (cur.updated || 0)) byId.set(h.id, h);
+    }
+    const cells = d => {
+      const s = new Set(d.pauses.map(k => `${k}|pause`));
+      for (const [k, ids] of Object.entries(d.log)) for (const id of ids) s.add(`${k}|${id}`);
+      return s;
+    };
+    const ca = cells(a), cb = cells(b), sa = a.stamps || {}, sb = b.stamps || {};
+    const out = { version: 1, habits: [...byId.values()].map(h => ({ ...h })), log: {}, pauses: [], stamps: {},
+      lastExport: [a.lastExport, b.lastExport].filter(Boolean).sort().pop() || null };
+    for (const c of new Set([...ca, ...cb, ...Object.keys(sa), ...Object.keys(sb)])) {
+      const ta = sa[c] || 0, tb = sb[c] || 0;
+      const on = ta === tb ? ca.has(c) || cb.has(c) : ta > tb ? ca.has(c) : cb.has(c);
+      if (ta || tb) out.stamps[c] = Math.max(ta, tb);
+      if (!on) continue;
+      const day = c.slice(0, 10), id = c.slice(11);
+      if (id === 'pause') out.pauses.push(day);
+      else (out.log[day] = out.log[day] || []).push(id);
+    }
+    out.pauses.sort();
+    return out;
   }
 
   // eligible = habit exists that day and day is not paused
@@ -110,7 +146,7 @@
     };
   }
 
-  const api = { dayKey, addDays, weekStart, isDone, isPaused, toggle, togglePause, weekCount, isDue, dayScore, streak, percent, validate, newId, defaultData };
+  const api = { dayKey, addDays, weekStart, isDone, isPaused, toggle, togglePause, merge, weekCount, isDue, dayScore, streak, percent, validate, newId, defaultData };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.HabitLogic = api;
 })(this);

@@ -100,9 +100,98 @@ function load() {
   localStorage.setItem(KEY, JSON.stringify(d));
   return d;
 }
-function save() {
+function persist() {
   try { localStorage.setItem(KEY, JSON.stringify(data)); }
   catch (e) { alert('Could not save: ' + e.message + '. Export a backup now.'); }
+}
+function save() { persist(); scheduleSync(); }
+// re-render, but never wipe a half-filled habit form
+const safeRender = () => { if (!editing) render(); };
+
+// ---- Sync between devices via a private GitHub gist ----
+const SYNC_KEY = 'habits-sync'; // { token, gistId } — kept apart from data so it never lands in an export
+const FILE = 'habits-data.json';
+let sync = JSON.parse(localStorage.getItem(SYNC_KEY) || 'null');
+let syncStatus = '';
+let syncTimer = null, syncing = null, again = false;
+
+async function gh(path, opts = {}) {
+  const r = await fetch('https://api.github.com' + path, {
+    ...opts, cache: 'no-store',
+    headers: { Authorization: 'Bearer ' + sync.token, Accept: 'application/vnd.github+json', ...(opts.body ? { 'Content-Type': 'application/json' } : {}) },
+  });
+  if (!r.ok) throw new Error(r.status === 401 ? 'token invalid or expired' : r.status === 403 || r.status === 404 ? 'no access — token needs Gists: Read and write' : 'GitHub error ' + r.status);
+  return r.json();
+}
+async function pullRemote() {
+  const f = (await gh('/gists/' + sync.gistId)).files[FILE];
+  if (!f) throw new Error('data file missing in gist');
+  const obj = JSON.parse(f.truncated ? await (await fetch(f.raw_url, { cache: 'no-store' })).text() : f.content);
+  if (!L.validate(obj)) throw new Error('cloud data is not valid');
+  return obj;
+}
+const pushRemote = d => gh('/gists/' + sync.gistId, { method: 'PATCH', body: JSON.stringify({ files: { [FILE]: { content: JSON.stringify(d) } } }) });
+const clock = () => new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+function scheduleSync() {
+  if (!sync) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(syncNow, 1500);
+}
+// pull -> merge -> push if cloud is behind. Failures keep local data; next sync retries.
+// ponytail: no locking — if both devices push within the same second, one write can be lost from the gist,
+// but that device still has it locally and re-pushes it on its next sync. Add ETag checks if that ever bites.
+function syncNow() {
+  clearTimeout(syncTimer); syncTimer = null;
+  if (!sync) return Promise.resolve();
+  if (syncing) { again = true; return syncing; }
+  syncing = (async () => {
+    try {
+      const remote = await pullRemote();
+      const merged = L.merge(data, remote);
+      const s = JSON.stringify(merged);
+      const localChanged = s !== JSON.stringify(data);
+      data = merged;
+      persist();
+      if (s !== JSON.stringify(remote)) await pushRemote(merged);
+      syncStatus = 'Synced at ' + clock();
+      if (localChanged) safeRender();
+    } catch (e) {
+      syncStatus = (navigator.onLine ? 'Sync failed: ' + e.message : 'Offline') + ' — will retry';
+    } finally {
+      syncing = null;
+      if (tab === 'settings') safeRender();
+      if (again) { again = false; scheduleSync(); }
+    }
+  })();
+  return syncing;
+}
+
+async function connect(token) {
+  if (!token) return render();
+  sync = { token, gistId: null };
+  try {
+    const found = (await gh('/gists?per_page=100')).find(g => g.files && g.files[FILE]);
+    if (found) {
+      sync.gistId = found.id;
+      const remote = await pullRemote();
+      const localEmpty = !Object.keys(data.log).length && !data.pauses.length;
+      if (localEmpty) data = remote; // fresh device: just take the cloud copy
+      else if (confirm('The cloud already has habit data. Merge it with the data on this device?')) data = L.merge(data, remote);
+      else { sync = null; return render(); }
+      persist();
+      await pushRemote(data);
+    } else {
+      const g = await gh('/gists', { method: 'POST', body: JSON.stringify({ description: 'Habits app data — synced by the app, do not edit', public: false, files: { [FILE]: { content: JSON.stringify(data) } } }) });
+      sync.gistId = g.id;
+    }
+    localStorage.setItem(SYNC_KEY, JSON.stringify(sync));
+    syncStatus = 'Synced at ' + clock();
+  } catch (e) {
+    sync = null;
+    alert('Could not connect: ' + e.message);
+  }
+  render();
 }
 
 function label(key) {
@@ -198,7 +287,17 @@ function renderSettings() {
     <p class="muted">Your data lives only on this phone. Last backup: ${data.lastExport ? label(data.lastExport) : 'never'}.
       ${persisted === true ? 'Storage is persistent.' : persisted === false ? 'The browser may clear storage when space runs low — export regularly.' : ''}</p>
     <button class="btn" data-act="export">Export backup (.json)</button>
-    <button class="btn" data-act="import">Import backup</button>`;
+    <button class="btn" data-act="import">Import backup</button>
+    <h2>Sync between devices</h2>
+    ${sync ? `
+      <p class="muted">Synced through a private GitHub gist. ${esc(syncStatus)}</p>
+      <button class="btn" data-act="syncnow">Sync now</button>
+      <button class="btn" data-act="disconnect">Disconnect this device</button>` : `
+      <p class="muted">Keeps phone and computer in sync through a private gist on your GitHub.
+        Create a token at <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener" style="color:var(--accent)">github.com → Fine-grained token</a>:
+        Account permissions → <b>Gists: Read and write</b>, nothing else. Paste it on every device.</p>
+      <input id="token" type="password" placeholder="github_pat_…" autocomplete="off" style="width:100%">
+      <button class="btn primary" data-act="connect">Connect</button>`}`;
 }
 
 function render() {
@@ -214,6 +313,7 @@ function move(id, dir) {
   while (j >= 0 && j < data.habits.length && data.habits[j].archived) j += dir; // skip archived
   if (j < 0 || j >= data.habits.length) return;
   [data.habits[idx], data.habits[j]] = [data.habits[j], data.habits[idx]];
+  data.habits[idx].updated = data.habits[j].updated = Date.now(); // so the new order wins on sync
 }
 
 function exportData() {
@@ -242,9 +342,14 @@ document.addEventListener('click', ev => {
     case 'cancel': editing = null; break;
     case 'up': move(id, -1); save(); break;
     case 'down': move(id, 1); save(); break;
-    case 'archive': if (h) { h.archived = !h.archived; if (editing === id) editing = null; save(); } break;
+    case 'archive': if (h) { h.archived = !h.archived; h.updated = Date.now(); if (editing === id) editing = null; save(); } break;
     case 'export': exportData(); break;
     case 'import': document.getElementById('importFile').click(); return;
+    case 'connect': b.disabled = true; b.textContent = 'Connecting…'; connect(document.getElementById('token').value.trim()); return;
+    case 'syncnow': syncStatus = 'Syncing…'; syncNow(); break;
+    case 'disconnect':
+      if (!confirm('Stop syncing this device? Data stays here and in the gist.')) return;
+      localStorage.removeItem(SYNC_KEY); sync = null; syncStatus = ''; break;
     default: return;
   }
   render();
@@ -258,8 +363,9 @@ document.addEventListener('submit', ev => {
   const fv = String(f.get('freq'));
   const freq = fv === 'daily' ? { kind: 'daily' } : { kind: 'weekly', times: Number(fv.slice(1)) };
   const note = String(f.get('note')).trim();
-  if (editing === 'new') data.habits.push({ id: L.newId(), name, note, type: 'check', freq, created: today(), archived: false });
-  else Object.assign(data.habits.find(h => h.id === editing), { name, note, freq });
+  const updated = Date.now();
+  if (editing === 'new') data.habits.push({ id: L.newId(), name, note, type: 'check', freq, created: today(), archived: false, updated });
+  else Object.assign(data.habits.find(h => h.id === editing), { name, note, freq, updated });
   editing = null;
   save();
   render();
@@ -280,16 +386,20 @@ document.getElementById('importFile').addEventListener('change', async ev => {
 });
 
 // "today" moves at 04:00 even if the app stayed open
+// leaving the app: push pending changes now. Coming back: pull what the other device did.
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) return;
+  if (document.hidden) { if (syncTimer) syncNow(); return; }
   const t = today();
   if (t !== lastToday) { if (viewDay === lastToday) viewDay = t; lastToday = t; }
-  render();
+  safeRender();
+  syncNow();
 });
+window.addEventListener('online', () => syncNow());
 
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().then(ok => { persisted = ok; if (tab === 'settings') render(); });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 render();
+syncNow();
 </script>
 </body>
 </html>
