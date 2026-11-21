@@ -31,13 +31,27 @@
     stamp(data, `${key}|pause`, now);
   }
 
+  // Permanently remove a habit and its history. A tombstone (`deleted[id] = time`) stops sync from bringing it back.
+  function deleteHabit(data, id, now = Date.now()) {
+    data.habits = data.habits.filter(h => h.id !== id);
+    for (const [k, ids] of Object.entries(data.log)) {
+      data.log[k] = ids.filter(x => x !== id);
+      if (!data.log[k].length) delete data.log[k];
+    }
+    for (const c of Object.keys(data.stamps || {})) if (c.slice(11) === id) delete data.stamps[c];
+    (data.deleted = data.deleted || {})[id] = now;
+  }
+
   // Merge two copies of the data (phone + computer). Cells: newer stamp wins, no stamps = union.
-  // Habits: newer `updated` wins per id; order from the side edited most recently.
+  // Habits: newer `updated` wins per id; order from the side edited most recently. Deleted ids stay deleted.
   function merge(a, b) {
+    const deleted = { ...(a.deleted || {}) };
+    for (const [id, t] of Object.entries(b.deleted || {})) deleted[id] = Math.max(deleted[id] || 0, t);
     const newest = d => d.habits.reduce((m, h) => Math.max(m, h.updated || 0), 0);
     const [first, second] = newest(a) >= newest(b) ? [a, b] : [b, a];
     const byId = new Map();
     for (const h of [...first.habits, ...second.habits]) {
+      if (deleted[h.id]) continue;
       const cur = byId.get(h.id);
       if (!cur || (h.updated || 0) > (cur.updated || 0)) byId.set(h.id, h);
     }
@@ -49,7 +63,9 @@
     const ca = cells(a), cb = cells(b), sa = a.stamps || {}, sb = b.stamps || {};
     const out = { version: 1, habits: [...byId.values()].map(h => ({ ...h })), log: {}, pauses: [], stamps: {},
       lastExport: [a.lastExport, b.lastExport].filter(Boolean).sort().pop() || null };
+    if (Object.keys(deleted).length) out.deleted = deleted;
     for (const c of new Set([...ca, ...cb, ...Object.keys(sa), ...Object.keys(sb)])) {
+      if (deleted[c.slice(11)]) continue;
       const ta = sa[c] || 0, tb = sb[c] || 0;
       const on = ta === tb ? ca.has(c) || cb.has(c) : ta > tb ? ca.has(c) : cb.has(c);
       if (ta || tb) out.stamps[c] = Math.max(ta, tb);
@@ -220,7 +236,7 @@
     };
   }
 
-  const api = { dayKey, addDays, weekStart, dow, isScheduled, isDone, isPaused, toggle, togglePause, merge, weekCount, isDue, dayScore, isPerfect, perfectStreak,
+  const api = { dayKey, addDays, weekStart, dow, isScheduled, isDone, isPaused, toggle, togglePause, merge, deleteHabit, weekCount, isDue, dayScore, isPerfect, perfectStreak,
     streak, bestStreak, percent, cellStatus, weakDay, validate, newId, defaultData };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.HabitLogic = api;

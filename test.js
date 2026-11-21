@@ -242,4 +242,22 @@ assert.notStrictEqual(L.newId(), L.newId());
   assert.strictEqual(L.perfectStreak(data([]), T), 0);   // no habits
 }
 
+// --- permanent delete (from archive) survives sync ---
+{
+  const a = data([daily(), weekly(2)], { d: ['2026-11-18', T], w: [T] });
+  const b = JSON.parse(JSON.stringify(a));                 // other device still has the habit
+  L.toggle(b, 'd', '2026-11-17', 50);                      // ...and even logs it later
+  L.deleteHabit(a, 'd', 100);
+  assert.deepStrictEqual(a.habits.map(h => h.id), ['w']);
+  assert.ok(!L.isDone(a, 'd', T) && L.isDone(a, 'w', T));
+  assert.ok(!Object.keys(a.stamps || {}).some(k => k.endsWith('|d')));
+  const m = L.merge(a, b), m2 = L.merge(b, a);
+  for (const x of [m, m2]) {
+    assert.deepStrictEqual(x.habits.map(h => h.id), ['w']);     // doesn't come back
+    assert.ok(!Object.values(x.log).some(ids => ids.includes('d')));
+    assert.ok(x.deleted && x.deleted.d === 100);
+  }
+  assert.ok(L.validate(m));
+}
+
 console.log('all tests passed');
