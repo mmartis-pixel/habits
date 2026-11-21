@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0f1115">
-<title>Habits</title>
+<title>OLYX</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
 <style>
@@ -44,30 +44,30 @@
 
   .heat { display: grid; grid-template-rows: repeat(7, 1fr); grid-auto-flow: column; grid-auto-columns: 1fr; gap: 5px; }
   .heat b { font-size: .7rem; color: var(--muted); font-weight: 500; display: grid; place-items: center; }
-  /* day rings: grey arc = share done; perfect day = green disc with check */
-  .cal12 { display: grid; grid-template-columns: 40px repeat(7, minmax(0, 1fr)); gap: 6px 4px; align-items: center; justify-items: center; }
-  .cal12 b { font-size: .7rem; color: var(--muted); font-weight: 500; }
-  .cal12 .wk { font-size: .66rem; color: var(--muted); white-space: nowrap; justify-self: start; }
-  .rg { position: relative; width: 100%; max-width: 44px; aspect-ratio: 1; display: grid; place-items: center; padding: 0; border: 0; background: none; border-radius: 50%; }
-  .rg svg { width: 100%; height: 100%; overflow: visible; grid-area: 1 / 1; }
-  .rg .tr { fill: none; stroke: #23262e; stroke-width: 3.5; }
-  .rg .arc { fill: none; stroke: var(--rc); stroke-width: 3.5; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 20px 20px;
-    animation: arc-in .7s cubic-bezier(.3, 0, .2, 1) both; }
-  @keyframes arc-in { from { stroke-dasharray: 0 107; } }
-  .rg .ct { grid-area: 1 / 1; font-size: .64rem; font-weight: 700; color: var(--rc); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
-  .rg.full .disc { fill: url(#perfectGrad); filter: drop-shadow(0 0 4px rgb(52 211 153 / .55)); }
-  .rg.full .ck { fill: none; stroke: #053b2a; stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; }
-  .rg.full svg { animation: disc-in .45s cubic-bezier(.2, 1.6, .4, 1) both; animation-delay: calc(var(--i) * 7ms); }
-  @keyframes disc-in { from { transform: scale(.3); opacity: 0; } }
-  .rg.rest::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: #2a2e37; grid-area: 1 / 1; }
-  .rg.paused { background: repeating-linear-gradient(45deg, #2a2e37 0 3px, #1c1f26 3px 6px); transform: scale(.78); }
-  .rg.today { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--muted); }
-  .rg.sm { max-width: 26px; }
-  .legend .lg { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -2px; margin-right: 5px; }
-  .lg.full { background: linear-gradient(#6ee7b7, #10b981); box-shadow: 0 0 4px rgb(52 211 153 / .6); }
-  .legend .lg.grad { width: 46px; border-radius: 6px; height: 8px; vertical-align: 0;
-    background: linear-gradient(90deg, hsl(0 85% 58%), hsl(14 85% 58%), hsl(30 85% 58%), hsl(50 85% 58%), hsl(88 85% 58%), hsl(140 85% 58%)); }
-  .lg.rest { background: radial-gradient(circle, #2a2e37 2px, transparent 2.5px); }
+  /* 12-week dots: colour = share done (red → orange → yellow → green), perfect day = glowing green */
+  .dots { display: grid; grid-template-rows: 16px repeat(7, 20px); grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
+    gap: 4px 2px; align-items: center; justify-items: center; }
+  .dots .dl, .dots .mh { font-size: .62rem; color: var(--muted); justify-self: start; white-space: nowrap; }
+  .dt { position: relative; width: 12px; height: 12px; border-radius: 50%; border: 0; padding: 0; background: var(--rc, #2a2e37); transition: transform .12s; }
+  .dt::after { content: ''; position: absolute; inset: -5px; } /* bigger tap target */
+  .dt.full { width: 14px; height: 14px; background: linear-gradient(#6ee7b7, #10b981); box-shadow: 0 0 0 2px rgb(52 211 153 / .22), 0 0 8px rgb(52 211 153 / .6); }
+  .dt.rest { width: 4px; height: 4px; background: #2f343e; }
+  .dt.paused { background: repeating-linear-gradient(45deg, #4b5260 0 2px, #1c1f26 2px 4px); }
+  .dt.future { width: 4px; height: 4px; background: #1d2027; }
+  .dt.today { outline: 1.5px solid var(--text); outline-offset: 2.5px; }
+  .dt[data-day]:hover { transform: scale(1.4); }
+  #tip { position: fixed; z-index: 35; width: 210px; padding: 10px 12px; border-radius: 12px; background: #1d2129; border: 1px solid var(--line);
+    box-shadow: 0 12px 30px rgb(0 0 0 / .5); font-size: .8rem; pointer-events: none; opacity: 0; transform: translateY(4px); transition: opacity .12s, transform .12s; }
+  #tip.show { opacity: 1; transform: none; pointer-events: auto; }
+  #tip b { display: block; }
+  #tip > span { display: block; font-weight: 600; margin: 1px 0 6px; }
+  #tip ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+  #tip li { display: flex; align-items: center; gap: 7px; color: var(--muted); }
+  #tip li::before { content: ''; flex: none; width: 7px; height: 7px; border-radius: 50%; background: #3a404c; }
+  #tip li.ok { color: var(--text); } #tip li.ok::before { background: var(--accent); }
+  #tip li.no::before { background: #f87171; }
+  #tip em { font-style: normal; font-size: .68rem; color: var(--accent); }
+  #tip button { margin-top: 8px; width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--accent); font-weight: 600; }
   body.still *, body.still *::before, body.still *::after { animation: none !important; transition: none !important; }
 
   table { width: 100%; border-collapse: collapse; }
@@ -245,6 +245,33 @@
   /* "calm" = big motion off (rotating rays, breathing flame); small effects stay. Set by Settings → Effects */
   body.calm .cel-rays, body.calm .flame.big { animation: none !important; }
   .row button.danger { color: #f87171; border-color: rgb(248 113 113 / .4); }
+
+  /* onboarding */
+  body.onboarding nav { display: none; }
+  .ob { min-height: calc(100vh - 40px); display: flex; flex-direction: column; }
+  .ob0, .ob2 { justify-content: center; align-items: center; text-align: center; gap: 4px; }
+  .logo { width: 92px; height: 92px; filter: drop-shadow(0 0 18px rgb(52 211 153 / .35)); }
+  .ob0 h1 { font-size: 2.6rem; letter-spacing: .22em; margin: 14px 0 0 .22em; }
+  .ob0 p { color: var(--muted); font-size: 1.1rem; margin: 6px 0 36px; line-height: 1.5; }
+  .ob0 .btn, .ob2 .btn { max-width: 340px; }
+  .ob-h { font-size: 1.45rem; margin: 8px 0 4px; color: var(--text); }
+  .ob1 section { margin-top: 18px; }
+  .ob1 h3 { font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; }
+  .ob-chips { display: grid; gap: 6px; }
+  .ob-chip { display: flex; flex-direction: column; align-items: flex-start; text-align: left; padding: 11px 14px; border-radius: 12px;
+    border: 1px solid var(--line); background: var(--card); transition: border-color .15s, background .15s; }
+  .ob-chip span { font-size: .78rem; color: var(--muted); }
+  .ob-chip.on { border-color: var(--accent); background: rgb(52 211 153 / .1); }
+  .ob-chip.on b::before { content: '✓  '; color: var(--accent); }
+  .ob-bar { position: sticky; bottom: 0; display: flex; gap: 10px; align-items: center; margin-top: 20px; padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
+    background: var(--bg); box-shadow: 0 -16px 16px -4px var(--bg); }
+  .ob-bar .btn { margin: 0; }
+  .ob-bar .btn.link { width: auto; white-space: nowrap; }
+  .btn:disabled { opacity: .45; }
+  .ob-time { display: flex; align-items: center; gap: 10px; margin: 18px 0 8px; color: var(--text); font-size: 1rem; }
+  .remrow { display: flex; gap: 10px; align-items: end; }
+  .remrow label { flex: none; }
+  .remrow .seg { flex: 1; }
   .btn.link { background: none; border: 0; color: var(--muted); margin-top: 6px; padding: 8px; }
   #toast .ti { display: block; margin: 0 auto 6px; width: 34px; height: 34px; color: var(--accent); }
   #toast .ti svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -286,7 +313,7 @@
   .rv-stats .up b { color: var(--accent); } .rv-stats .down b { color: #f87171; }
   .rv-verdict { margin: 12px 0; font-weight: 600; }
   .rv-cal { gap: 5px; margin-bottom: 10px; }
-  .rv-cal .rg { max-width: 30px; }
+  .rv-cal { row-gap: 10px; }
   .rv-row { display: flex; align-items: baseline; gap: 8px; padding: 9px 0; border-top: 1px solid var(--line); }
   .rv-row span { color: var(--muted); font-size: .8rem; min-width: 110px; }
   .rv-row b { flex: 1; font-weight: 600; }
@@ -301,76 +328,6 @@
   .mrev i { font-style: normal; font-size: 1.5rem; color: var(--accent); }
   .hlink { border: 0; background: none; padding: 0; text-align: left; font-weight: 500; text-decoration: underline; text-decoration-color: #3a404c; text-underline-offset: 3px; }
 
-  /* achievements: muted line icons, colour only once earned */
-  .badges { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .badge { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 8px 10px; text-align: center; overflow: hidden; }
-  .badge i { display: grid; place-items: center; width: 44px; height: 44px; margin: 0 auto 6px; border-radius: 50%; border: 1.5px solid #2f343e; color: #4b5260; }
-  .badge i svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-  .badge i svg text { fill: currentColor; stroke: none; font: 800 8px system-ui; }
-  .badge i .flame { width: 24px; height: 24px; filter: grayscale(1) opacity(.45); animation: none; }
-  .badge b { display: block; font-size: .8rem; }
-  .badge span { display: block; font-size: .68rem; color: var(--muted); line-height: 1.3; margin-top: 2px; }
-  .badge u { position: absolute; left: 0; bottom: 0; height: 3px; width: calc(var(--p) * 100%); background: #3a404c; }
-  .badge.on { border-color: rgb(52 211 153 / .3); }
-  .badge.on i { color: var(--accent); border-color: rgb(52 211 153 / .55); box-shadow: 0 0 12px rgb(52 211 153 / .15) inset; }
-  .badge.on i .flame { filter: drop-shadow(0 0 3px var(--glow)); }
-
-  /* toast + confetti */
-  #toast { position: fixed; left: 50%; top: 30%; transform: translate(-50%, 12px) scale(.96); opacity: 0; pointer-events: none; z-index: 30; min-width: 220px;
-    background: var(--card); border: 1px solid var(--accent); border-radius: 16px; padding: 16px 22px; text-align: center; transition: .25s; box-shadow: 0 16px 40px rgb(0 0 0 / .55); }
-  #toast.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
-  #toast b { display: block; font-size: 1.05rem; }
-  #toast span { color: var(--muted); font-size: .85rem; }
-  #confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 45; }
-
-  /* plan board */
-  main.wide { max-width: 1240px; }
-  h1.title { font-size: 1.35rem; margin: 4px 0 2px; }
-  .board { display: grid; grid-auto-flow: column; grid-auto-columns: 78%; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory;
-    margin: 14px -16px 0; padding: 0 16px 10px; scroll-padding: 0 16px; scrollbar-width: thin; }
-  .col { scroll-snap-align: start; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 8px; min-height: 200px; }
-  .col.today { border-color: rgb(52 211 153 / .6); }
-  .col header { display: flex; align-items: baseline; gap: 8px; padding: 0 2px 2px; }
-  .col header span { color: var(--muted); font-size: .8rem; }
-  .col header em { margin-left: auto; font-style: normal; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--accent); }
-  .pcard { text-align: left; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
-  .pcard:hover { border-color: #3a404c; }
-  .pcard .name { font-weight: 600; overflow-wrap: anywhere; }
-  /* fewer pixels per card as columns fill up: details go to one line, then hide (still in the tooltip) */
-  .board.compact .col { gap: 5px; padding: 10px; min-height: 0; }
-  .board.compact .pcard { padding: 7px 10px; border-radius: 10px; }
-  .board.compact .pcard .name { font-size: .92rem; }
-  .board.compact .pcard .note { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .78rem; }
-  .board.compact .add { padding: 7px; }
-  .board.dense .col { gap: 4px; padding: 8px; min-height: 0; }
-  .board.dense .pcard { padding: 5px 9px; border-radius: 8px; }
-  .board.dense .pcard .name { font-size: .85rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .board.dense .pcard .note { display: none; }
-  .board.dense .add { padding: 5px; font-size: .85rem; }
-  .board.dense header, .board.compact header { padding-bottom: 0; }
-  .add { border: 1px dashed var(--line); background: none; color: var(--muted); border-radius: 12px; padding: 10px; }
-  .col .add { margin-top: auto; }
-  .add:hover { color: var(--text); border-color: var(--muted); }
-  .empty-col { margin: 4px 2px; }
-  .flexlist { display: grid; gap: 8px; }
-  @media (min-width: 900px) {
-    .board { grid-auto-flow: row; grid-template-columns: repeat(8, minmax(0, 1fr)); overflow: visible; margin: 14px 0 0; padding: 0; }
-    .flexlist { grid-template-columns: repeat(4, 1fr); }
-  }
-
-  /* dialog */
-  body.locked { overflow: hidden; }
-  .backdrop { position: fixed; inset: 0; background: rgb(0 0 0 / .6); z-index: 20; animation: fade .15s; }
-  .sheet { position: fixed; left: 50%; bottom: 0; transform: translateX(-50%); width: min(560px, 100%); max-height: 92vh; overflow-y: auto; z-index: 21;
-    border-radius: 20px 20px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom)); animation: fade .18s; box-shadow: 0 -10px 40px rgb(0 0 0 / .5); }
-  @media (min-width: 700px) { .sheet { bottom: auto; top: 50%; transform: translate(-50%, -50%); border-radius: 20px; } }
-  @keyframes fade { from { opacity: 0; } }
-  .sheet h3 { margin: 0 0 2px; font-size: 1.15rem; }
-  .rec { color: var(--accent); font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-left: 6px; }
-  .quick { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-  .qchip { border: 1px solid var(--accent); color: var(--accent); background: none; border-radius: 999px; padding: 7px 13px; font-weight: 600; }
-  .or { text-align: center; color: var(--muted); font-size: .8rem; margin: 2px 0; }
-  .btns.secondary .btn { margin: 0; font-size: .85rem; padding: 10px 6px; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -388,6 +345,7 @@
 </defs></svg>
 <main id="view"></main>
 <div id="toast" role="status" aria-live="polite"></div>
+<div id="tip" role="tooltip"></div>
 <nav>
   <button data-tab="today">Today</button>
   <button data-tab="plan">Plan</button>
@@ -443,13 +401,19 @@ function load() {
     localStorage.setItem(KEY + '-corrupt-' + Date.now(), raw);
     alert('Saved data could not be read. A copy was kept. Starting fresh — import a backup in Settings.');
   }
-  const d = L.defaultData(today());
+  const d = { version: 1, habits: [], log: {}, pauses: [], lastExport: null }; // onboarding fills it
   localStorage.setItem(KEY, JSON.stringify(d));
   return d;
 }
 function persist() {
   try { localStorage.setItem(KEY, JSON.stringify(data)); }
   catch (e) { alert('Could not save: ' + e.message + '. Export a backup now.'); }
+  snapshot();
+}
+// copy of the data (+ sync info) for the service worker, which can't read localStorage — used by reminders
+function snapshot() {
+  if (!('caches' in window)) return;
+  caches.open('olyx-state').then(c => c.put('state', new Response(JSON.stringify({ data, sync })))).catch(() => {});
 }
 function save() { persist(); scheduleSync(); }
 // re-render, but never wipe a half-filled habit form
@@ -529,10 +493,11 @@ async function connect(token) {
       persist();
       await pushRemote(data);
     } else {
-      const g = await gh('/gists', { method: 'POST', body: JSON.stringify({ description: 'Habits app data — synced by the app, do not edit', public: false, files: { [FILE]: { content: JSON.stringify(data) } } }) });
+      const g = await gh('/gists', { method: 'POST', body: JSON.stringify({ description: 'OLYX data — synced by the app, do not edit', public: false, files: { [FILE]: { content: JSON.stringify(data) } } }) });
       sync.gistId = g.id;
     }
     localStorage.setItem(SYNC_KEY, JSON.stringify(sync));
+    snapshot();
     syncStatus = 'Synced at ' + clock();
   } catch (e) {
     sync = null;
@@ -644,20 +609,21 @@ function renderStats() {
       <td class="${w ? 'weak' : ''}">${w ? `${WD[w.day]} <span class="muted">${Math.round(w.rate * 100)}%</span>` : '—'}</td></tr>`;
   }).join('');
 
-  // 12 weeks as a calendar (rows = weeks): every day is a ring coloured by how much got done
-  // (red → orange → yellow → green) with "done/planned" inside; a perfect day is a green disc with a check
+  // 12 weeks as dots (columns = weeks, rows = Mon..Sun), coloured by share done; hover / tap = day summary
   const start = L.addDays(L.weekStart(t), -7 * 11);
-  let cells = '<span></span>' + ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(d => `<b>${d}</b>`).join('');
-  let perfect12 = 0;
-  for (let i = 0; i < 84; i++) {
-    const k = L.addDays(start, i);
-    if (i % 7 === 0) cells += `<span class="wk">${Number(k.slice(8))} ${MONTHS[Number(k.slice(5, 7)) - 1]}</span>`;
-    cells += dayRing(k, t, i);
-    if (k <= t && L.isPerfect(data, k)) perfect12++;
+  let cells = '<span></span>' + ['M', '', 'W', '', 'F', '', 'S'].map(d => `<span class="dl">${d}</span>`).join('');
+  let perfect12 = 0, shown = '';
+  for (let w = 0; w < 12; w++) {
+    const ws = L.addDays(start, w * 7), mon = MONTHS[Number(L.addDays(ws, 6).slice(5, 7)) - 1];
+    cells += `<span class="mh">${mon !== shown ? (shown = mon) : ''}</span>`; // month name once, where it starts
+    for (let d = 0; d < 7; d++) {
+      const k = L.addDays(ws, d);
+      cells += dayDot(k, t);
+      if (k <= t && L.isPerfect(data, k)) perfect12++;
+    }
   }
 
   const ms = L.monthStats(data, t.slice(0, 7), t);
-  const badges = L.achievements(data, t), unlocked = badges.filter(a => a.unlocked).length;
   return `
     <button class="mrev" data-act="mreview">
       <span><b>${FULLMONTH[Number(t.slice(5, 7)) - 1]} review</b><em>${ms && ms.completion != null ? `${ms.completion}% so far · ${ms.perfect} perfect day${ms.perfect === 1 ? '' : 's'}` : 'See how your month is going'}</em></span>
@@ -676,20 +642,8 @@ function renderStats() {
     <h2>Habits</h2>
     <table><tr><th>Habit</th><th>Streak</th><th>Best</th><th>${range} d</th><th>Most missed</th></tr>${rows}</table>
     <p class="muted">Tap a habit for its full history. Streak counts scheduled days in a row (weeks for flexible habits). Paused and unscheduled days are skipped; today doesn't count against you until it's over. "Most missed" shows a weekday that clearly stands out — skipped at least 35 % of the time over the last 90 days.</p>
-    <h2>Last 12 weeks</h2>
-    <p class="muted" style="margin-top:-4px">${perfect12 ? `<b style="color:var(--accent)">${perfect12}</b> perfect day${perfect12 === 1 ? '' : 's'} collected. ` : ''}Tap a day to open it.</p>
-    <div class="cal12">${cells}</div>
-    <div class="legend">
-      <span><i class="lg full"></i>Perfect day</span>
-      <span><i class="lg grad"></i>0 % → 99 % done</span>
-      <span><i class="lg rest"></i>Nothing planned</span>
-      <span><i class="c paused"></i>Paused</span>
-    </div>
-    <h2>Achievements <span class="muted">${unlocked} / ${badges.length}</span></h2>
-    <div class="badges">${badges.map(a => `<div class="badge ${a.unlocked ? 'on' : ''}" title="${esc(a.desc)}">
-      <i>${badgeIcon(a)}</i><b>${a.name}</b>
-      <span>${a.unlocked ? a.desc : a.need > 1 ? `${a.progress} / ${a.need}` : a.desc}</span>
-      ${!a.unlocked && a.need > 1 ? `<u style="--p:${a.progress / a.need}"></u>` : ''}</div>`).join('')}</div>`;
+    <h2>Last 12 weeks${perfect12 ? ` <span class="muted">· ${perfect12} perfect day${perfect12 === 1 ? '' : 's'}</span>` : ''}</h2>
+    <div class="dots">${cells}</div>`;
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -701,22 +655,41 @@ function pctColor(p) {
   const [p0, h0] = stops[i - 1], [p1, h1] = stops[i];
   return `hsl(${Math.round(h0 + (h1 - h0) * (p - p0) / (p1 - p0))} 85% 58%)`;
 }
-// one day as a ring (used by the 12-week calendar and the monthly review)
-function dayRing(k, t, i = 0, small = false) {
-  const now = k === t ? ' today' : '', sm = small ? ' sm' : '';
-  const open = small ? '' : `data-act="open" data-day="${k}"`;
-  const tag = small ? 'i' : 'button';
-  if (k > t) return `<i class="rg future${sm}"></i>`;
-  if (L.isPaused(data, k)) return `<${tag} class="rg paused${now}${sm}" ${open} title="${label(k)} · paused"></${tag}>`;
+// one day as a dot (12-week view + monthly review); colour = share done, perfect day = glowing green
+function dayDot(k, t) {
+  if (k > t) return '<i class="dt future"></i>';
+  const now = k === t ? ' today' : '', at = `data-act="dot" data-day="${k}"`;
+  if (L.isPaused(data, k)) return `<button class="dt paused${now}" ${at} aria-label="${label(k)}, paused"></button>`;
   const s = L.dayScore(data, k);
-  if (!s.total) return `<${tag} class="rg rest${now}${sm}" ${open} title="${label(k)} · nothing planned"></${tag}>`;
-  const p = s.done / s.total, C = 2 * Math.PI * 17;
-  if (p === 1) return `<${tag} class="rg full${now}${sm}" ${open} style="--i:${i}" title="${label(k)} · all ${s.total} done">
-    <svg viewBox="0 0 40 40" aria-hidden="true"><circle class="disc" cx="20" cy="20" r="19"/><path class="ck" d="M12.5 20.5l5 5 10-11"/></svg></${tag}>`;
-  return `<${tag} class="rg part${now}${sm}" ${open} style="--rc:${pctColor(p)}" title="${label(k)} · ${s.done}/${s.total} (${Math.round(p * 100)} %)">
-    <svg viewBox="0 0 40 40" aria-hidden="true"><circle class="tr" cx="20" cy="20" r="17"/>${s.done ? `<circle class="arc" cx="20" cy="20" r="17" stroke-dasharray="${(p * C).toFixed(1)} ${C.toFixed(1)}"/>` : ''}</svg>
-    ${small ? '' : `<span class="ct">${s.done}/${s.total}</span>`}</${tag}>`;
+  if (!s.total) return `<button class="dt rest${now}" ${at} aria-label="${label(k)}, nothing planned"></button>`;
+  const p = s.done / s.total;
+  return `<button class="dt ${p === 1 ? 'full' : 'part'}${now}" ${at} style="--rc:${pctColor(p)}" aria-label="${label(k)}, ${s.done} of ${s.total} done"></button>`;
 }
+
+// day summary popup: hover on desktop, tap on phones (with a button to open the day)
+const canHover = matchMedia('(hover: hover)').matches;
+let tipDay = null;
+function showTip(el) {
+  const k = el.dataset.day, t = today(), tip = document.getElementById('tip');
+  const s = L.dayScore(data, k), paused = L.isPaused(data, k);
+  const hs = data.habits.filter(h => !h.archived && h.created <= k && (L.isDue(data, h, k) || L.isDone(data, h, k)));
+  const head = paused ? 'Paused' : s.total ? `${s.done} of ${s.total} done · ${Math.round(s.done / s.total * 100)} %` : 'Nothing planned';
+  tip.innerHTML = `<b>${label(k)}</b><span style="color:${!paused && s.total ? (s.done === s.total ? 'var(--accent)' : pctColor(s.done / s.total)) : 'var(--muted)'}">${head}</span>
+    ${hs.length ? `<ul>${hs.slice(0, 10).map(h => {
+      const d = L.isDone(data, h.id, k), bonus = !L.isDue(data, h, k);
+      return `<li class="${d ? 'ok' : k === t ? 'wait' : 'no'}">${esc(h.name)}${bonus ? ' <em>bonus</em>' : ''}</li>`;
+    }).join('')}</ul>` : ''}
+    ${canHover ? '' : `<button data-act="open" data-day="${k}">Open day ›</button>`}`;
+  tip.classList.add('show');
+  const r = el.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+  tip.style.left = Math.max(8, Math.min(innerWidth - tw - 8, r.left + r.width / 2 - tw / 2)) + 'px';
+  tip.style.top = (r.top - th - 10 > 8 ? r.top - th - 10 : r.bottom + 10) + 'px';
+  tipDay = k;
+}
+function hideTip() { document.getElementById('tip')?.classList.remove('show'); tipDay = null; }
+document.addEventListener('mouseover', e => { const d = canHover && e.target.closest('.dt[data-day]'); if (d) showTip(d); });
+document.addEventListener('mouseout', e => { if (canHover && e.target.closest('.dt[data-day]')) hideTip(); });
+addEventListener('scroll', hideTip, { passive: true });
 
 // ---- Plan: 8 columns (Every day + Mon..Sun), flexible habits below ----
 const FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -796,6 +769,11 @@ function renderSettings() {
     <h2>Effects</h2>
     ${seg('setmotion', ui.motion || 'system', [['system', 'System'], ['full', 'Full'], ['still', 'Still']])}
     <p class="muted">System: small animations always, big ones (confetti, rays) only if your device doesn't ask for reduced motion. Full: everything. Still: no animation. Saved per device.</p>
+    <h2>Daily reminder</h2>
+    ${!canPush() ? `<p class="muted">${PUSH_API ? 'This browser can\'t show reminders. On Android use Chrome and install OLYX to the home screen.' : 'Reminders are almost ready — they switch on with the next update.'}</p>` : `
+      <div class="remrow"><label>Time <input type="time" id="remtime" value="${(ui.reminder && ui.reminder.time) || '21:00'}"></label>
+        ${seg('setrem', ui.reminder && ui.reminder.on ? 'on' : 'off', [['on', 'On'], ['off', 'Off']])}</div>
+      <p class="muted">${esc(remStatus || (ui.reminder && ui.reminder.on ? `Every day at ${ui.reminder.time}. It tells you what's left — or that the day is done.` : 'One notification a day with what is left to do.'))}</p>`}
     <h2>Backup</h2>
     <p class="muted">Your data lives on this device${sync ? ' and in your private gist' : ' only'}. Last backup: ${data.lastExport ? label(data.lastExport) : 'never'}.
       ${persisted === true ? 'Storage is persistent.' : persisted === false ? 'The browser may clear storage when space runs low — export regularly.' : ''}</p>
@@ -817,6 +795,8 @@ function render() {
   const view = document.getElementById('view');
   const board = document.querySelector('.board');
   const boardScroll = board ? board.scrollLeft : null; // keep the board where it was when the dialog opens/closes
+  document.body.classList.toggle('onboarding', !!onboard);
+  if (onboard) { view.innerHTML = renderOnboard(); window.scrollTo(0, 0); applyMotion(); return; }
   view.innerHTML = { today: renderToday, plan: renderPlan, stats: renderStats, settings: renderSettings }[tab]()
     + (detail ? detailSheet() : review ? reviewSheet() : '');
   view.classList.toggle('wide', tab === 'plan');
@@ -862,11 +842,6 @@ function applyMotion() {
 function nextCelebration() {
   if (document.querySelector('.cel') || !queue.length) return;
   const c = queue.shift();
-  if (c.kind === 'badge') { // achievements: a quiet toast + chime, never a full-screen card
-    toast('Achievement unlocked', c.a.name, badgeIcon(c.a));
-    Sfx.play('badge');
-    return setTimeout(nextCelebration, 2900);
-  }
   Sfx.play(c.kind === 'tier' ? 'tier' : 'day');
   const el = document.createElement('div');
   el.className = 'cel';
@@ -990,7 +965,6 @@ const Sfx = (() => {
     day: () => { [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(f, i * .085, .6, { type: 'triangle', gain: .11 })); tone(2093, .36, .9, { gain: .03 }); },
     tier: () => { [261.63, 329.63, 392].forEach(f => tone(f, 0, 1.2, { type: 'triangle', gain: .06 }));
       [783.99, 987.77, 1174.66, 1567.98, 1975.53].forEach((f, i) => tone(f, .18 + i * .07, .45, { gain: .05 })); },
-    badge: () => { tone(1318.51, 0, .3, { type: 'triangle', gain: .07 }); tone(1975.53, .11, .6, { gain: .06 }); },
     pop: () => tone(880, 0, .08, { type: 'triangle', gain: .06, to: 1250 }),
     soft: () => tone(660, 0, .07, { gain: .035 }),
     pause: () => tone(392, 0, .28, { gain: .05, to: 294 }),
@@ -1044,7 +1018,7 @@ function reviewSheet() {
   const delta = s && s.completion != null && p && p.completion != null && p.checkins ? s.completion - p.completion : null;
   const first = `${ym}-01`, n = new Date(Date.UTC(y, m, 0)).getUTCDate();
   let cal = WD.map(d => `<b>${d[0]}</b>`).join('') + '<i></i>'.repeat(L.dow(first));
-  for (let i = 0; i < n; i++) cal += dayRing(L.addDays(first, i), t, i, true);
+  for (let i = 0; i < n; i++) cal += dayDot(L.addDays(first, i), t);
   const c = s && s.completion != null ? s.completion : 0, R = 46, C = 2 * Math.PI * R;
   const verdict = !s || s.completion == null ? 'Nothing logged this month yet.' : c >= 90 ? 'Outstanding month.' : c >= 75 ? 'Solid month — keep the rhythm.'
     : c >= 50 ? 'Halfway there. Next month, a bit more.' : 'A fresh month is a fresh start.';
@@ -1082,71 +1056,76 @@ function drawFlame(g, n, x, y, size) {
   g.save(); g.translate(x - size / 2, y - size / 2); g.scale(size / 24, size / 24);
   const gr = g.createLinearGradient(0, 24, 0, 0);
   FL_STOPS[t].forEach((c, i, a) => gr.addColorStop(i / (a.length - 1), c));
-  g.shadowColor = FL_STOPS[t][1]; g.shadowBlur = 30;
+  g.shadowColor = FL_STOPS[t][1]; g.shadowBlur = size / 12;
   g.fillStyle = gr; g.fill(new Path2D(FLAME_D));
   g.shadowBlur = 0; g.globalAlpha = .92; g.fillStyle = CORE[t]; g.fill(new Path2D(CORE_D));
   g.restore();
 }
-function drawRing(g, x, y, r, p, w, perfect) {
-  g.lineCap = 'round';
-  if (perfect) {
+// a day as a dot on the share image (same language as the app)
+function drawDot(g, k, t, x, y, r) {
+  g.beginPath();
+  if (k > t) { g.fillStyle = '#1d2027'; g.arc(x, y, r * .25, 0, 7); g.fill(); return; }
+  if (L.isPaused(data, k)) { g.strokeStyle = '#3a404c'; g.lineWidth = 4; g.arc(x, y, r * .7, 0, 7); g.stroke(); return; }
+  const s = L.dayScore(data, k);
+  if (!s.total) { g.fillStyle = '#2f343e'; g.arc(x, y, r * .3, 0, 7); g.fill(); return; }
+  if (s.done === s.total) {
+    g.fillStyle = 'rgba(52,211,153,.18)'; g.arc(x, y, r * 1.35, 0, 7); g.fill();
     const gr = g.createLinearGradient(0, y - r, 0, y + r); gr.addColorStop(0, '#6ee7b7'); gr.addColorStop(1, '#10b981');
-    g.fillStyle = gr; g.beginPath(); g.arc(x, y, r + w / 2, 0, 7); g.fill();
-    g.strokeStyle = '#053b2a'; g.lineWidth = w * .9; g.beginPath();
-    g.moveTo(x - r * .42, y + r * .02); g.lineTo(x - r * .1, y + r * .32); g.lineTo(x + r * .45, y - r * .3); g.stroke();
-    return;
+    g.beginPath(); g.fillStyle = gr; g.arc(x, y, r * 1.08, 0, 7); g.fill(); return;
   }
-  g.strokeStyle = '#23262e'; g.lineWidth = w; g.beginPath(); g.arc(x, y, r, 0, 7); g.stroke();
-  if (p > 0) { g.strokeStyle = pctColor(p); g.beginPath(); g.arc(x, y, r, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2); g.stroke(); }
+  g.fillStyle = pctColor(s.done / s.total); g.arc(x, y, r * .9, 0, 7); g.fill();
 }
+// share image, 1080×1920 (story). Clean: one big number, plenty of space, left-aligned type, dots.
 async function shareImage(kind) {
-  const W = 1080, H = 1920, c = document.createElement('canvas');
+  const W = 1080, H = 1920, X = 96, c = document.createElement('canvas');
   c.width = W; c.height = H;
-  const g = c.getContext('2d'), t = today(), font = (w, s) => `${w} ${s}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-  const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#13161c'); bg.addColorStop(1, '#0b0d11');
-  g.fillStyle = bg; g.fillRect(0, 0, W, H);
-  const glow = g.createRadialGradient(W / 2, 520, 0, W / 2, 520, 700); glow.addColorStop(0, 'rgba(52,211,153,.16)'); glow.addColorStop(1, 'rgba(52,211,153,0)');
-  g.fillStyle = glow; g.fillRect(0, 0, W, H);
-  g.textAlign = 'center'; g.fillStyle = '#8b93a1'; g.font = font(700, 34); g.fillText('H A B I T S', W / 2, 150);
-  let title = '';
+  const g = c.getContext('2d'), t = today(), ps = L.perfectStreak(data, t);
+  const font = (w, s) => `${w} ${s}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
+  const text = (s, x, y, f, col, align = 'left', spacing = 0) => {
+    g.font = f; g.fillStyle = col; g.textAlign = align; g.letterSpacing = spacing + 'px'; g.fillText(s, x, y); g.letterSpacing = '0px';
+  };
+  g.fillStyle = '#0f1115'; g.fillRect(0, 0, W, H);
+  text('OLYX', X, 170, font(700, 40), '#e8eaed', 'left', 10);
+  let title;
   if (kind === 'streak') {
-    const ps = L.perfectStreak(data, t);
     title = `${ps}-day streak`;
-    drawFlame(g, ps, W / 2, 560, 420);
-    g.fillStyle = '#e8eaed'; g.font = font(800, 220); g.fillText(String(ps), W / 2, 1010);
-    g.fillStyle = '#8b93a1'; g.font = font(600, 54); g.fillText(`perfect day${ps === 1 ? '' : 's'} in a row`, W / 2, 1090);
-    g.fillStyle = FL_STOPS[tierOf(ps)][2]; g.font = font(700, 40); g.fillText(TIERS[tierOf(ps)].name.toUpperCase(), W / 2, 1170);
+    text('STREAK', W - X, 170, font(600, 28), '#8b93a1', 'right', 4);
+    drawFlame(g, ps, W / 2, 720, 360);
+    text(String(ps), W / 2, 1150, font(700, 260), '#e8eaed', 'center');
+    text(`perfect day${ps === 1 ? '' : 's'} in a row`, W / 2, 1235, font(500, 46), '#8b93a1', 'center');
+    text(TIERS[tierOf(ps)].name.toUpperCase(), W / 2, 1310, font(700, 30), FL_STOPS[tierOf(ps)][1], 'center', 5);
+    const cell = (W - 2 * X) / 7;
     for (let i = 0; i < 7; i++) {
-      const k = L.addDays(t, i - 6), x = W / 2 + (i - 3) * 130, s = L.dayScore(data, k);
-      drawRing(g, x, 1380, 44, s.total ? s.done / s.total : 0, 12, L.isPerfect(data, k));
-      g.fillStyle = k === t ? '#e8eaed' : '#8b93a1'; g.font = font(600, 30); g.fillText(WD[L.dow(k)].slice(0, 2), x, 1470);
+      const k = L.addDays(t, i - 6), x = X + cell / 2 + i * cell;
+      drawDot(g, k, t, x, 1520, 24);
+      text(WD[L.dow(k)].slice(0, 1), x, 1600, font(600, 28), k === t ? '#e8eaed' : '#5b6270', 'center');
     }
   } else {
     const ym = review ? review.ym : t.slice(0, 7), s = L.monthStats(data, ym, t) || {};
-    const [y, m] = ym.split('-').map(Number), comp = s.completion || 0;
+    const [y, m] = ym.split('-').map(Number);
     title = `${FULLMONTH[m - 1]} ${y}`;
-    g.fillStyle = '#e8eaed'; g.font = font(800, 84); g.fillText(title, W / 2, 290);
-    drawRing(g, W / 2, 560, 190, comp / 100, 34, comp === 100);
-    if (comp < 100) { g.fillStyle = '#e8eaed'; g.font = font(800, 120); g.fillText(`${comp}%`, W / 2, 600); }
-    g.fillStyle = '#8b93a1'; g.font = font(600, 38); g.fillText('completion', W / 2, 820);
+    text(title.toUpperCase(), W - X, 170, font(600, 28), '#8b93a1', 'right', 4);
+    text(s.completion != null ? `${s.completion}%` : '—', X - 8, 560, font(700, 280), '#e8eaed');
+    text('completion', X, 640, font(500, 44), '#8b93a1');
+    g.fillStyle = '#23262e'; g.fillRect(X, 730, W - 2 * X, 2);
     [[s.perfect || 0, 'perfect days'], [s.bestRun || 0, 'best run'], [s.checkins || 0, 'check-ins']].forEach(([v, l], i) => {
-      const x = W / 2 + (i - 1) * 320;
-      g.fillStyle = '#e8eaed'; g.font = font(800, 84); g.fillText(String(v), x, 980);
-      g.fillStyle = '#8b93a1'; g.font = font(600, 32); g.fillText(l, x, 1030);
+      text(String(v), X + i * 300, 860, font(700, 88), '#e8eaed');
+      text(l, X + i * 300, 912, font(500, 30), '#8b93a1');
     });
-    const first = `${ym}-01`, n = new Date(Date.UTC(y, m, 0)).getUTCDate(), off = L.dow(first);
+    const cell = (W - 2 * X) / 7, first = `${ym}-01`, n = new Date(Date.UTC(y, m, 0)).getUTCDate(), off = L.dow(first);
+    WD.forEach((d, i) => text(d.slice(0, 1), X + cell / 2 + i * cell, 1060, font(600, 26), '#5b6270', 'center'));
     for (let i = 0; i < n; i++) {
-      const k = L.addDays(first, i), col = (i + off) % 7, row = Math.floor((i + off) / 7);
-      const x = W / 2 + (col - 3) * 112, yy = 1150 + row * 112;
-      if (k > t) { g.fillStyle = '#23262e'; g.beginPath(); g.arc(x, yy, 5, 0, 7); g.fill(); continue; }
-      const sc = L.dayScore(data, k);
-      if (L.isPaused(data, k) || !sc.total) { g.fillStyle = '#2a2e37'; g.beginPath(); g.arc(x, yy, 6, 0, 7); g.fill(); continue; }
-      drawRing(g, x, yy, 36, sc.done / sc.total, 10, sc.done === sc.total);
+      const col = (i + off) % 7, row = Math.floor((i + off) / 7);
+      drawDot(g, L.addDays(first, i), t, X + cell / 2 + col * cell, 1140 + row * 104, 26);
     }
   }
-  g.fillStyle = '#5b6270'; g.font = font(600, 30); g.fillText('Built one day at a time', W / 2, H - 110);
+  if (kind !== 'streak' && ps) {
+    drawFlame(g, ps, X + 18, H - 132, 40);
+    text(`${ps}-day streak`, X + 52, H - 120, font(600, 32), '#8b93a1');
+  }
+  text('Built one day at a time.', W - X, H - 120, font(500, 30), '#5b6270', 'right');
   const blob = await new Promise(r => c.toBlob(r, 'image/png'));
-  const file = new File([blob], `habits-${kind}-${t}.png`, { type: 'image/png' });
+  const file = new File([blob], `olyx-${kind}-${t}.png`, { type: 'image/png' });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try { await navigator.share({ files: [file], title }); return; } catch (e) { if (e.name === 'AbortError') return; }
   }
@@ -1156,28 +1135,84 @@ async function shareImage(kind) {
   toast('Image saved', 'Check your downloads');
 }
 
-// ---- achievements: quiet, derived from data; unlocks announced once per device ----
-const BADGE_ICONS = {
-  first: '<path d="M6 12.5l4 4 8-9"/>',
-  perfect1: '<circle cx="12" cy="12" r="9"/><path d="M8 12.4l2.8 2.8L16.2 9.6"/>',
-  week: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',
-  early: '<path d="M3 18h18M7 18a5 5 0 0 1 10 0M12 8V5M5.2 11.2 3.8 9.8M18.8 11.2l1.4-1.4"/>',
-  comeback: '<path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/>',
-  planner: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
-  month90: '<path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8"/>',
-};
-const BADGE_TEXT = { c100: '100', c500: '500', c1000: '1K' };
-const BADGE_FLAME = { ember: 7, blue: 30, gold: 100, legend: 365 };
-function badgeIcon(a) {
-  if (BADGE_FLAME[a.id]) return flame(BADGE_FLAME[a.id]);
-  if (BADGE_TEXT[a.id]) return `<svg viewBox="0 0 24 24" aria-hidden="true"><text x="12" y="16" text-anchor="middle">${BADGE_TEXT[a.id]}</text></svg>`;
-  return `<svg viewBox="0 0 24 24" aria-hidden="true">${BADGE_ICONS[a.id] || ''}</svg>`;
+// ---- onboarding (first run only): welcome → starter habits → evening reminder ----
+const PACKS = [
+  { name: 'Morning', items: [['Wake up on time', 'Out of bed by 7:00'], ['Drink water', '500 ml right after waking'], ['Morning routine', 'Stretch, shower, plan the day']] },
+  { name: 'Fitness', items: [['Workout', '45 min', { kind: 'days', days: [0, 2, 4] }], ['Walk', '8,000 steps'], ['Stretch', '10 min']] },
+  { name: 'Nutrition', items: [['Protein with every meal', ''], ['No sugary drinks', ''], ['Creatine', '5 g']] },
+  { name: 'Sleep', items: [['Sleep 7+ hours', ''], ['Phone off before bed', '30 min before sleep'], ['Lights out by 23:00', '']] },
+  { name: 'Focus', items: [['Deep work', '90 min, phone in another room', { kind: 'days', days: [0, 1, 2, 3, 4] }], ['Read', '20 pages'], ['Plan tomorrow', '5 min in the evening']] },
+  { name: 'Mind', items: [['Meditate', '10 min'], ['Journal', '3 lines'], ['Gratitude', 'Write down one thing']] },
+];
+const LOGO = '<svg class="logo" viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="lg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6ee7b7"/><stop offset="1" stop-color="#10b981"/></linearGradient></defs>'
+  + '<path d="M60.7 18.8A33 33 0 1 0 81.2 39.3" fill="none" stroke="url(#lg1)" stroke-width="9.7" stroke-linecap="round"/><circle cx="73.3" cy="26.7" r="7" fill="#ecfdf5"/></svg>';
+let onboard = null; // { step, picked: ['pack:item', ...] }
+function renderOnboard() {
+  if (onboard.step === 0) return `<div class="ob ob0">
+    ${LOGO}<h1>OLYX</h1><p>Build habits that stick.<br>One day at a time.</p>
+    <button class="btn primary" data-act="ob-next">Get started</button>
+    <button class="btn link" data-act="ob-sync">I already use OLYX on another device</button></div>`;
+  if (onboard.step === 1) {
+    const n = onboard.picked.length;
+    return `<div class="ob ob1"><h2 class="ob-h">Pick a few habits to start</h2><p class="muted">Start small — 3 to 5 is plenty. You can change everything later in Plan.</p>
+      ${PACKS.map((p, i) => `<section><h3>${p.name}</h3><div class="ob-chips">${p.items.map(([name, note, f], j) => {
+        const k = `${i}:${j}`, on = onboard.picked.includes(k);
+        return `<button class="ob-chip ${on ? 'on' : ''}" data-act="ob-pick" data-k="${k}" aria-pressed="${on}"><b>${name}</b>${note || f ? `<span>${[note, f ? freqText(f) : ''].filter(Boolean).join(' · ')}</span>` : ''}</button>`;
+      }).join('')}</div></section>`).join('')}
+      <div class="ob-bar"><button class="btn link" data-act="ob-done">Start empty</button>
+        <button class="btn primary" data-act="ob-next" ${n ? '' : 'disabled'}>Continue${n ? ` · ${n}` : ''}</button></div></div>`;
+  }
+  return `<div class="ob ob2">${LOGO}<h2 class="ob-h">A nudge in the evening?</h2>
+    <p class="muted">One quiet notification a day, only to remind you what's left.</p>
+    <label class="ob-time">Remind me at <input type="time" id="obtime" value="21:00"></label>
+    <button class="btn primary" data-act="ob-remind">Turn on reminder</button>
+    <button class="btn link" data-act="ob-done">Not now</button></div>`;
 }
-function checkBadges() {
-  const list = L.achievements(data, today()), got = list.filter(a => a.unlocked).map(a => a.id);
-  if (!ui.badges) { ui.badges = got; saveUi(); return; } // first run: existing ones count as seen, no flood
-  for (const a of list) if (a.unlocked && !ui.badges.includes(a.id)) { ui.badges.push(a.id); queue.push({ kind: 'badge', a }); }
-  saveUi();
+function finishOnboarding() {
+  const t = today(), now = Date.now();
+  for (const k of onboard ? onboard.picked : []) {
+    const [i, j] = k.split(':').map(Number), [name, note, f] = PACKS[i].items[j];
+    data.habits.push({ id: L.newId(), name, note, type: 'check', freq: f || { kind: 'daily' }, created: t, archived: false, updated: now });
+  }
+  onboard = null; ui.onboarded = true; saveUi(); save();
+  tab = 'today'; viewDay = t;
+  if (data.habits.length) toast('Welcome to OLYX', 'Tick your first habit today');
+  Sfx.play('pop');
+}
+
+// ---- daily reminder: Web Push from a tiny Cloudflare Worker (olyx-reminders) ----
+const PUSH_API = ''; // set once the worker is deployed, e.g. 'https://olyx-reminders.<account>.workers.dev'
+const VAPID_PUBLIC = 'BIkGEm4pxuy3W9NC7wtmgOSD6sgFsAYZ5SW4PsWu9qGJBFi0OuX6SvdUWa0E5l4rVMY5cPhn4ybw54kKGdexX6M';
+const canPush = () => !!PUSH_API && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+let remStatus = '';
+const b64u = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - s.length % 4) % 4)), c => c.charCodeAt(0));
+async function enableReminder(time) {
+  try {
+    if (Notification.permission !== 'granted' && await Notification.requestPermission() !== 'granted') {
+      remStatus = 'Notifications are blocked — allow them for this site in the browser settings.';
+      return render();
+    }
+    const reg = await navigator.serviceWorker.ready;
+    const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(VAPID_PUBLIC) });
+    const r = await fetch(PUSH_API + '/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subscription: sub.toJSON(), time, tz: Intl.DateTimeFormat().resolvedOptions().timeZone }) });
+    if (!r.ok) throw new Error('server said ' + r.status);
+    ui.reminder = { on: true, time }; saveUi(); snapshot();
+    remStatus = `Every day at ${time}.`;
+  } catch (e) { remStatus = 'Could not turn on the reminder: ' + e.message; }
+  render();
+}
+async function disableReminder() {
+  try {
+    const sub = await (await navigator.serviceWorker.ready).pushManager.getSubscription();
+    if (sub) {
+      await fetch(PUSH_API + '/unsubscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: sub.endpoint }) }).catch(() => {});
+      await sub.unsubscribe();
+    }
+  } catch (e) {}
+  ui.reminder = { on: false, time: (ui.reminder && ui.reminder.time) || '21:00' }; saveUi();
+  remStatus = 'Reminder off.';
+  render();
 }
 
 function move(id, dir) {
@@ -1194,12 +1229,13 @@ function exportData() {
   save();
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
-  a.download = `habits-${today()}.json`;
+  a.download = `olyx-backup-${today()}.json`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
 document.addEventListener('click', ev => {
+  if (!ev.target.closest('#tip, .dt')) hideTip();
   const b = ev.target.closest('button, .backdrop, .cel-bg');
   if (!b) return;
   if (b.dataset.tab) { tab = b.dataset.tab; editing = detail = review = null; if (tab === 'today') viewDay = today(); return render(); }
@@ -1226,7 +1262,6 @@ document.addEventListener('click', ev => {
         const ps = L.perfectStreak(data, t);
         queue.push({ kind: 'day', ps, tierUp: ps >= 7 && TIERS.some(x => x.at === ps) });
       }
-      checkBadges();
       if (navigator.vibrate && !queue.length) navigator.vibrate(8);
       break;
     }
@@ -1237,8 +1272,15 @@ document.addEventListener('click', ev => {
     case 'addday': if (h && typeof addCol === 'number') {
       const days = [...h.freq.days, addCol].sort();
       h.freq = days.length === 7 ? { kind: 'daily' } : { kind: 'days', days };
-      h.updated = Date.now(); editing = null; save(); Sfx.play('pop'); checkBadges();
+      h.updated = Date.now(); editing = null; save(); Sfx.play('pop');
     } break;
+    // onboarding
+    case 'ob-next': onboard.step++; if (onboard.step === 2 && !canPush()) { finishOnboarding(); } break;
+    case 'ob-pick': { const k = b.dataset.k, i = onboard.picked.indexOf(k); i < 0 ? onboard.picked.push(k) : onboard.picked.splice(i, 1); Sfx.play(i < 0 ? 'pop' : 'soft'); break; }
+    case 'ob-done': finishOnboarding(); break;
+    case 'ob-sync': onboard = null; ui.onboarded = true; saveUi(); tab = 'settings'; break;
+    case 'ob-remind': { const time = document.getElementById('obtime').value || '21:00'; finishOnboarding(); enableReminder(time); break; }
+    case 'setrem': if (b.dataset.v === 'on') enableReminder(document.getElementById('remtime').value || '21:00'); else disableReminder(); return;
     // sound & effects
     case 'setsound': ui.sound = b.dataset.v === 'on'; saveUi(); Sfx.play('pop'); break;
     case 'setmotion': ui.motion = b.dataset.v; saveUi(); break;
@@ -1250,7 +1292,6 @@ document.addEventListener('click', ev => {
       const k = b.dataset.day;
       L.toggle(data, detail.id, k); save();
       Sfx.play(L.isDone(data, detail.id, k) ? 'tick' : 'untick', 3);
-      checkBadges();
       break;
     }
     // monthly review + sharing
@@ -1261,7 +1302,11 @@ document.addEventListener('click', ev => {
     case 'review': ui.reviewed = L.addDays(today(), -1); saveUi(); viewDay = ui.reviewed; break;
     case 'dismiss': ui.reviewed = L.addDays(today(), -1); saveUi(); break;
     case 'range': range = Number(b.dataset.n); break;
-    case 'open': viewDay = b.dataset.day; tab = 'today'; break;
+    case 'open': viewDay = b.dataset.day; tab = 'today'; review = null; hideTip(); break;
+    case 'dot': // desktop: open the day; phone: first tap shows the summary
+      if (canHover) { viewDay = b.dataset.day; tab = 'today'; review = null; hideTip(); break; }
+      if (tipDay === b.dataset.day) hideTip(); else showTip(b);
+      return;
     case 'pause': L.togglePause(data, viewDay); save(); Sfx.play('pause'); break;
     case 'new': editing = 'new'; addCol = /^\d$/.test(b.dataset.col) ? Number(b.dataset.col) : b.dataset.col; break;
     case 'edit': editing = id; break;
@@ -1275,7 +1320,7 @@ document.addEventListener('click', ev => {
     case 'syncnow': syncStatus = 'Syncing…'; syncNow(); break;
     case 'disconnect':
       if (!confirm('Stop syncing this device? Data stays here and in the gist.')) return;
-      localStorage.removeItem(SYNC_KEY); sync = null; syncStatus = ''; break;
+      localStorage.removeItem(SYNC_KEY); sync = null; syncStatus = ''; snapshot(); break;
     default: return;
   }
   render();
@@ -1298,7 +1343,6 @@ document.addEventListener('submit', ev => {
   Sfx.play(editing === 'new' ? 'pop' : 'soft');
   editing = null;
   save();
-  checkBadges();
   render();
   nextCelebration();
 });
@@ -1311,6 +1355,7 @@ document.addEventListener('keydown', ev => {
 
 // show weekday chips only for "Specific days"
 document.addEventListener('change', ev => {
+  if (ev.target.id === 'remtime') { const time = ev.target.value || '21:00'; if (ui.reminder && ui.reminder.on) enableReminder(time); else { ui.reminder = { on: false, time }; saveUi(); } return; }
   if (ev.target.name === 'freq') ev.target.form.dataset.kind = ev.target.value === 'days' ? 'days' : '';
 });
 
@@ -1320,7 +1365,7 @@ document.getElementById('importFile').addEventListener('change', async ev => {
   if (!file) return;
   let obj;
   try { obj = JSON.parse(await file.text()); } catch (e) { return alert('That file is not valid JSON.'); }
-  if (!L.validate(obj)) return alert('That file is not a Habits backup. Nothing was changed.');
+  if (!L.validate(obj)) return alert('That file is not an OLYX backup. Nothing was changed.');
   const days = Object.keys(obj.log).length;
   if (!confirm(`Replace all current data with this backup (${obj.habits.length} habits, ${days} logged days)?`)) return;
   data = obj;
@@ -1341,7 +1386,9 @@ window.addEventListener('online', () => syncNow());
 
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().then(ok => { persisted = ok; if (tab === 'settings') render(); });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
-checkBadges(); // first run only records what's already unlocked
+
+// onboarding until it was finished once (also if the app was closed halfway through)
+if (!ui.onboarded && !data.habits.length && !Object.keys(data.log).length) onboard = { step: 0, picked: [] };
 // first days of a new month: show last month's review once
 {
   const t = today(), prev = shiftMonth(t.slice(0, 7), -1), s = L.monthStats(data, prev, t);
