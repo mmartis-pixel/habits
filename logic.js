@@ -62,8 +62,14 @@
     return out;
   }
 
-  // eligible = habit exists that day and day is not paused
+  // ---- schedule ----
+  // freq: { kind: 'daily' } | { kind: 'days', days: [0..6] } (0 = Monday) | { kind: 'weekly', times: 1..7 }
+  const dow = key => (parse(key).getUTCDay() + 6) % 7;
+  const isScheduled = (habit, key) => habit.freq.kind === 'daily' || (habit.freq.kind === 'days' && habit.freq.days.includes(dow(key)));
+
+  // eligible = habit exists that day and day is not paused; counts = eligible and scheduled (daily / days habits)
   const eligible = (data, habit, key) => key >= habit.created && !isPaused(data, key);
+  const counts = (data, habit, key) => eligible(data, habit, key) && isScheduled(habit, key);
 
   function weekCount(data, habit, key) {
     const start = weekStart(key);
@@ -72,9 +78,10 @@
     return n;
   }
 
+  // due = belongs in that day's score. Done on an unscheduled day = bonus, not due.
   function isDue(data, habit, key) {
-    if (habit.freq.kind === 'daily' || isDone(data, habit.id, key)) return true;
-    return weekCount(data, habit, key) < habit.freq.times;
+    if (habit.freq.kind !== 'weekly') return isScheduled(habit, key);
+    return isDone(data, habit.id, key) || weekCount(data, habit, key) < habit.freq.times;
   }
 
   function dayScore(data, key) {
@@ -82,18 +89,21 @@
     return { done: hs.filter(h => isDone(data, h.id, key)).length, total: hs.length };
   }
 
-  function streak(data, habit, today) {
-    let n = 0;
-    if (habit.freq.kind === 'daily') {
-      for (let k = today; k >= habit.created; k = addDays(k, -1)) {
-        if (isPaused(data, k)) continue;
-        if (isDone(data, habit.id, k)) n++;
-        else if (k !== today) break; // unfinished today doesn't break
+  // Met (true) / missed (false) units since creation, oldest first: scheduled days for daily/days habits,
+  // weeks for weekly ones (required = min(times, non-paused days that week)). The current day/week is left
+  // out while it can still be met, so an unfinished today never breaks a streak.
+  function outcomes(data, habit, today) {
+    const out = [];
+    if (habit.freq.kind !== 'weekly') {
+      for (let k = habit.created; k <= today; k = addDays(k, 1)) {
+        if (!counts(data, habit, k)) continue;
+        const d = isDone(data, habit.id, k);
+        if (k !== today || d) out.push(d);
       }
-      return n;
+      return out;
     }
-    // weekly: required = min(times, eligible days in that week)
-    for (let w = weekStart(today); addDays(w, 6) >= habit.created; w = addDays(w, -7)) {
+    const cur = weekStart(today);
+    for (let w = weekStart(habit.created); w <= cur; w = addDays(w, 7)) {
       let possible = 0, done = 0;
       for (let i = 0; i < 7; i++) {
         const k = addDays(w, i);
@@ -102,36 +112,82 @@
         if (isDone(data, habit.id, k)) done++;
       }
       const required = Math.min(habit.freq.times, possible);
-      if (required === 0) continue;
-      if (done >= required) n++;
-      else if (w !== weekStart(today)) break; // unfinished current week doesn't break
+      if (!required) continue;
+      if (done >= required) out.push(true);
+      else if (w !== cur) out.push(false);
     }
+    return out;
+  }
+  function streak(data, habit, today) {
+    const o = outcomes(data, habit, today);
+    let n = 0;
+    while (n < o.length && o[o.length - 1 - n]) n++;
     return n;
+  }
+  function bestStreak(data, habit, today) {
+    let best = 0, run = 0;
+    for (const met of outcomes(data, habit, today)) { run = met ? run + 1 : 0; best = Math.max(best, run); }
+    return best;
   }
 
   function percent(data, habit, today, days) {
+    const weekly = habit.freq.kind === 'weekly';
     let elig = 0, done = 0;
     for (let i = 0; i < days; i++) {
       const k = addDays(today, -i);
-      if (!eligible(data, habit, k)) continue;
+      if (!(weekly ? eligible : counts)(data, habit, k)) continue;
       const d = isDone(data, habit.id, k);
       if (k === today && !d) continue; // today not over yet
       elig++;
       if (d) done++;
     }
     if (!elig) return null;
-    const expected = elig * (habit.freq.kind === 'daily' ? 1 : habit.freq.times / 7);
+    const expected = elig * (weekly ? habit.freq.times / 7 : 1);
     return Math.min(100, Math.round(done / expected * 100));
+  }
+
+  // What one habit looked like on one day — drives the stats grid.
+  function cellStatus(data, habit, key, today) {
+    if (key < habit.created || key > today) return 'none';
+    if (isPaused(data, key)) return 'paused';
+    const d = isDone(data, habit.id, key);
+    if (habit.freq.kind === 'weekly') return d ? 'done' : 'off';
+    if (!isScheduled(habit, key)) return d ? 'bonus' : 'off';
+    return d ? 'done' : key === today ? 'pending' : 'missed';
+  }
+
+  // Weekday (0 = Monday) missed most often in the last `days` — only when it clearly stands out:
+  // ≥ 5 samples, missed ≥ 35 % of the time and ≥ 20 points worse than the habit's overall miss rate.
+  function weakDay(data, habit, today, days = 90) {
+    if (habit.freq.kind === 'weekly') return null;
+    const n = Array(7).fill(0), miss = Array(7).fill(0);
+    for (let i = 1; i <= days; i++) { // from yesterday back: today isn't over
+      const k = addDays(today, -i);
+      if (!counts(data, habit, k)) continue;
+      n[dow(k)]++;
+      if (!isDone(data, habit.id, k)) miss[dow(k)]++;
+    }
+    const total = n.reduce((a, b) => a + b, 0);
+    const overall = total ? miss.reduce((a, b) => a + b, 0) / total : 0;
+    let worst = null;
+    for (let w = 0; w < 7; w++) {
+      if (n[w] < 5) continue;
+      const rate = miss[w] / n[w];
+      if (rate >= 0.35 && rate >= overall + 0.2 && (!worst || rate > worst.rate)) worst = { day: w, rate };
+    }
+    return worst;
   }
 
   function validate(o) {
     const isKey = k => typeof k === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(k);
+    const int = (x, lo, hi) => Number.isInteger(x) && x >= lo && x <= hi;
+    const freqOk = f => !!f && (f.kind === 'daily' || (f.kind === 'weekly' && int(f.times, 1, 7))
+      || (f.kind === 'days' && Array.isArray(f.days) && f.days.length > 0 && f.days.every(d => int(d, 0, 6))));
     return !!o && o.version === 1 && Array.isArray(o.habits) && Array.isArray(o.pauses)
       && !!o.log && typeof o.log === 'object' && !Array.isArray(o.log)
       && o.pauses.every(isKey)
       && Object.entries(o.log).every(([k, v]) => isKey(k) && Array.isArray(v))
-      && o.habits.every(h => h && typeof h.id === 'string' && typeof h.name === 'string' && isKey(h.created)
-        && h.freq && (h.freq.kind === 'daily' || (h.freq.kind === 'weekly' && h.freq.times >= 1 && h.freq.times <= 7)));
+      && o.habits.every(h => h && typeof h.id === 'string' && typeof h.name === 'string' && isKey(h.created) && freqOk(h.freq));
   }
 
   let seq = 0;
@@ -146,7 +202,8 @@
     };
   }
 
-  const api = { dayKey, addDays, weekStart, isDone, isPaused, toggle, togglePause, merge, weekCount, isDue, dayScore, streak, percent, validate, newId, defaultData };
+  const api = { dayKey, addDays, weekStart, dow, isScheduled, isDone, isPaused, toggle, togglePause, merge, weekCount, isDue, dayScore,
+    streak, bestStreak, percent, cellStatus, weakDay, validate, newId, defaultData };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.HabitLogic = api;
 })(this);

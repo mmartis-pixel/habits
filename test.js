@@ -161,4 +161,70 @@ assert.notStrictEqual(L.newId(), L.newId());
   assert.ok(L.validate(m));
 }
 
+// --- schedule: specific weekdays (0 = Monday) ---
+{
+  assert.strictEqual(L.dow('2026-11-16'), 0); // Monday
+  assert.strictEqual(L.dow('2026-11-22'), 6); // Sunday
+  const mwf = { id: 's', name: 'Gym', note: '', type: 'check', freq: { kind: 'days', days: [0, 2, 4] }, created: '2026-11-01', archived: false };
+  assert.ok(L.isScheduled(mwf, '2026-11-16') && !L.isScheduled(mwf, T)); // Mon yes, Thu no
+  const d = data([mwf], { s: ['2026-11-13', '2026-11-16', '2026-11-18'] }); // Fri, Mon, Wed
+  // Thu (today) is not scheduled -> doesn't break, Tue/Thu skipped, Wed 11-11 missed -> 3
+  assert.strictEqual(L.streak(d, mwf, T), 3);
+  assert.strictEqual(L.bestStreak(d, mwf, T), 3);
+  assert.strictEqual(L.percent(d, mwf, T, 7), 100); // 11-13, 11-16, 11-18 all done
+  assert.strictEqual(L.percent(data([mwf], { s: ['2026-11-13', '2026-11-18'] }), mwf, T, 7), 67);
+  assert.deepStrictEqual(L.dayScore(d, '2026-11-16'), { done: 1, total: 1 });
+  assert.deepStrictEqual(L.dayScore(d, T), { done: 0, total: 0 }); // not scheduled today
+  // ticking on an unscheduled day = bonus: doesn't count in score or streak
+  L.toggle(d, 's', T);
+  assert.deepStrictEqual(L.dayScore(d, T), { done: 0, total: 0 });
+  assert.strictEqual(L.cellStatus(d, mwf, T, T), 'bonus');
+  assert.strictEqual(L.streak(d, mwf, T), 3);
+  // cell states
+  assert.strictEqual(L.cellStatus(d, mwf, '2026-11-16', T), 'done');
+  assert.strictEqual(L.cellStatus(d, mwf, '2026-11-11', T), 'missed');
+  assert.strictEqual(L.cellStatus(d, mwf, '2026-11-17', T), 'off');
+  assert.strictEqual(L.cellStatus(d, mwf, '2026-10-30', T), 'none');      // before created
+  assert.strictEqual(L.cellStatus(d, mwf, '2026-11-20', T), 'none');      // future
+  const dd = daily(), pd = data([dd], {}, ['2026-11-18']);
+  assert.strictEqual(L.cellStatus(pd, dd, T, T), 'pending');               // today, not done yet
+  assert.strictEqual(L.cellStatus(pd, dd, '2026-11-18', T), 'paused');
+  const w = weekly(2);
+  assert.strictEqual(L.cellStatus(data([w], { w: [T] }), w, T, T), 'done');
+  assert.strictEqual(L.cellStatus(data([w]), w, '2026-11-18', T), 'off');
+}
+
+// --- best streak ---
+{
+  const h = daily('2026-11-01');
+  const d = data([h], { d: ['2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-07', '2026-11-08'] });
+  assert.strictEqual(L.bestStreak(d, h, T), 5);
+  assert.strictEqual(L.streak(d, h, T), 0);
+  const w = weekly(1, '2026-11-02');
+  const dw = data([w], { w: ['2026-11-03', '2026-11-10', T] });
+  assert.strictEqual(L.bestStreak(dw, w, T), 3);
+}
+
+// --- weakest weekday ---
+{
+  const h = daily('2026-08-01');
+  const done = [];
+  for (let k = '2026-08-01'; k < T; k = L.addDays(k, 1)) if (L.dow(k) !== 5) done.push(k); // skips every Saturday
+  const d = data([h], { d: done });
+  assert.deepStrictEqual(L.weakDay(d, h, T), { day: 5, rate: 1 });
+  const all = [];
+  for (let k = '2026-08-01'; k < T; k = L.addDays(k, 1)) all.push(k);
+  assert.strictEqual(L.weakDay(data([h], { d: all }), h, T), null);
+  assert.strictEqual(L.weakDay(data([weekly(3)]), weekly(3), T), null);
+}
+
+// --- validate schedule ---
+{
+  const withFreq = freq => { const d = L.defaultData(T); d.habits[0].freq = freq; return d; };
+  assert.ok(L.validate(withFreq({ kind: 'days', days: [0, 2, 4] })));
+  assert.ok(!L.validate(withFreq({ kind: 'days', days: [] })));
+  assert.ok(!L.validate(withFreq({ kind: 'days', days: [7] })));
+  assert.ok(!L.validate(withFreq({ kind: 'weekly', times: 0 })));
+}
+
 console.log('all tests passed');
