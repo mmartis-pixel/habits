@@ -22,9 +22,13 @@
 
   function toggle(data, id, key, now = Date.now()) {
     const day = data.log[key] || [];
-    data.log[key] = day.includes(id) ? day.filter(x => x !== id) : [...day, id];
+    const on = !day.includes(id);
+    data.log[key] = on ? [...day, id] : day.filter(x => x !== id);
     if (!data.log[key].length) delete data.log[key];
     stamp(data, `${key}|${id}`, now);
+    // logging a day before the habit was added = it really started then
+    const h = data.habits.find(x => x.id === id);
+    if (on && h && key < h.created) { h.created = key; h.updated = now; }
   }
   function togglePause(data, key, now = Date.now()) {
     data.pauses = isPaused(data, key) ? data.pauses.filter(k => k !== key) : [...data.pauses, key];

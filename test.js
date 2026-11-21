@@ -260,4 +260,18 @@ assert.notStrictEqual(L.newId(), L.newId());
   assert.ok(L.validate(m));
 }
 
+// --- logging a day before the habit was added moves its start back (added Gym on Sat, log Friday) ---
+{
+  const gym = { id: 'g', name: 'Gym', note: '', type: 'check', freq: { kind: 'days', days: [0, 1, 2, 4] }, created: '2026-11-21', archived: false };
+  const d = data([gym]);
+  assert.deepStrictEqual(L.dayScore(d, '2026-11-20'), { done: 0, total: 0 }); // not started yet
+  L.toggle(d, 'g', '2026-11-20', 500);                                         // Friday
+  assert.strictEqual(gym.created, '2026-11-20');
+  assert.strictEqual(gym.updated, 500);                                         // so the new start date syncs
+  assert.deepStrictEqual(L.dayScore(d, '2026-11-20'), { done: 1, total: 1 });
+  assert.strictEqual(L.cellStatus(d, gym, '2026-11-20', '2026-11-21'), 'done');
+  L.toggle(d, 'g', '2026-11-20', 600);                                          // unticking keeps the start
+  assert.strictEqual(gym.created, '2026-11-20');
+}
+
 console.log('all tests passed');

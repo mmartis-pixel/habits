@@ -11,7 +11,7 @@
   :root { --bg:#0f1115; --card:#181b22; --line:#262a33; --text:#e8eaed; --muted:#8b93a1; --accent:#34d399; --warn:#f59e0b; }
   * { box-sizing: border-box; }
   html, body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
-  main { max-width: 520px; margin: 0 auto; padding: 16px 16px calc(88px + env(safe-area-inset-bottom)); }
+  main { max-width: 520px; margin: 0 auto; padding: 16px 16px calc(88px + env(safe-area-inset-bottom)); overflow-x: clip; } /* clip: animations never cause sideways scroll */
   button, input, select { font: inherit; color: inherit; }
   button { cursor: pointer; }
   h2 { font-size: 1rem; color: var(--muted); font-weight: 600; margin: 24px 0 8px; }
@@ -42,12 +42,26 @@
   .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 700; }
   .banner { width: 100%; padding: 10px 12px; margin-bottom: 12px; border-radius: 12px; border: 1px solid var(--warn); background: none; color: var(--warn); text-align: left; }
 
-  .heat { display: grid; grid-template-rows: repeat(7, 1fr); grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; }
+  .heat { display: grid; grid-template-rows: repeat(7, 1fr); grid-auto-flow: column; grid-auto-columns: 1fr; gap: 5px; }
   .heat b { font-size: .7rem; color: var(--muted); font-weight: 500; display: grid; place-items: center; }
-  .cell { aspect-ratio: 1; border-radius: 4px; background: rgb(52 211 153 / calc(.08 + var(--r, 0) * .92)); }
-  .cell.future { background: none; }
-  .cell.pause { background: repeating-linear-gradient(45deg, #2a2e37 0 3px, #1c1f26 3px 6px); }
-  .cell.today { outline: 2px solid var(--text); outline-offset: 1px; }
+  /* day rings: grey arc = share done; perfect day = green disc with check */
+  .rg { aspect-ratio: 1; display: grid; place-items: center; padding: 0; border: 0; background: none; border-radius: 50%; }
+  .rg svg { width: 100%; height: 100%; overflow: visible; }
+  .rg .tr { fill: none; stroke: #262a33; stroke-width: 3; }
+  .rg .arc { fill: none; stroke: #9aa3b2; stroke-width: 3; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 12px 12px;
+    opacity: calc(.45 + var(--p) * .55); }
+  .rg.full .disc { fill: url(#perfectGrad); filter: drop-shadow(0 0 3px rgb(52 211 153 / .55)); }
+  .rg.full .ck { fill: none; stroke: #053b2a; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+  .rg.full svg { animation: disc-in .45s cubic-bezier(.2, 1.6, .4, 1) both; animation-delay: calc(var(--i) * 8ms); }
+  @keyframes disc-in { from { transform: scale(.3); opacity: 0; } }
+  .rg.rest::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: #2a2e37; }
+  .rg.paused { background: repeating-linear-gradient(45deg, #2a2e37 0 3px, #1c1f26 3px 6px); transform: scale(.8); }
+  .rg.today { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--muted); }
+  .legend .lg { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -2px; margin-right: 5px; }
+  .lg.full { background: linear-gradient(#6ee7b7, #10b981); box-shadow: 0 0 4px rgb(52 211 153 / .6); }
+  .lg.part { border: 2.5px solid #262a33; border-top-color: #9aa3b2; border-right-color: #9aa3b2; }
+  .lg.rest { background: radial-gradient(circle, #2a2e37 2px, transparent 2.5px); }
+  @media (prefers-reduced-motion: reduce) { .rg.full svg { animation: none; } }
 
   table { width: 100%; border-collapse: collapse; }
   td, th { padding: 10px 4px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
@@ -148,8 +162,25 @@
   .streak.cold, .pstreak.cold { color: var(--muted); }
   .cold .flame { filter: grayscale(1) !important; opacity: .5; animation: none !important; }
   .cold .flame .sp { display: none; }
-  .habit.done .streak .flame { animation: flicker .5s ease-out; }
-  @keyframes flicker { 0% { transform: scale(.6); } 60% { transform: scale(1.3); } 100% { transform: scale(1); } }
+  /* tick: box pops, flame catches fire, embers rise, number bumps */
+  .habit.ignite .box { animation: box-pop .35s cubic-bezier(.2, 1.8, .4, 1); }
+  @keyframes box-pop { 0% { transform: scale(.6); } 100% { transform: scale(1); } }
+  .streak { position: relative; }
+  .streak.ignite { animation: pill-flash .9s ease-out; }
+  @keyframes pill-flash { 0% { background: color-mix(in srgb, var(--tc) 45%, transparent); box-shadow: 0 0 14px color-mix(in srgb, var(--tc) 60%, transparent); } }
+  .streak.ignite .flame { transform-origin: 50% 90%; animation: ignite .75s cubic-bezier(.2, 1.6, .4, 1); }
+  @keyframes ignite {
+    0% { transform: scale(.2) rotate(-18deg); filter: grayscale(1) brightness(.6); }
+    35% { transform: scale(1.7) rotate(10deg); filter: brightness(1.8) drop-shadow(0 0 10px var(--tc, #f97316)); }
+    65% { transform: scale(.88) rotate(-4deg); }
+    100% { transform: scale(1) rotate(0); }
+  }
+  .streak.ignite b { display: inline-block; animation: num-bump .5s cubic-bezier(.2, 1.8, .4, 1) .15s both; }
+  @keyframes num-bump { 0% { transform: translateY(6px); opacity: 0; } 100% { transform: none; opacity: 1; } }
+  .ember { position: absolute; left: 13px; top: 8px; width: 4px; height: 4px; border-radius: 50%; background: var(--tc, #fbbf24);
+    box-shadow: 0 0 6px var(--tc, #fbbf24); opacity: 0; animation: ember .8s ease-out forwards; pointer-events: none; }
+  @keyframes ember { 0% { opacity: 1; transform: translate(0, 0) scale(1); } 100% { opacity: 0; transform: translate(var(--dx), -28px) scale(.2); } }
+  .habit.early { opacity: .6; border-style: dashed; }
   .pstreak { display: flex; align-items: center; justify-content: center; gap: 4px; font-size: .8rem; color: var(--tc, #fbbf24); margin-top: 2px; }
   td.st { color: var(--text); }
 
@@ -270,6 +301,7 @@
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <linearGradient id="perfectGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6ee7b7"/><stop offset="1" stop-color="#10b981"/></linearGradient>
   <!-- streak flame tiers: 0 Spark, 7 Ember, 14 Blaze, 30 Blue, 50 Violet, 100 Golden, 200 Inferno, 365 Legend -->
   <linearGradient id="fl0" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ea580c"/><stop offset=".6" stop-color="#f97316"/><stop offset="1" stop-color="#fbbf24"/></linearGradient>
   <linearGradient id="fl1" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#c2410c"/><stop offset=".55" stop-color="#f97316"/><stop offset="1" stop-color="#fde047"/></linearGradient>
@@ -304,6 +336,7 @@ let editing = null; // null | 'new' | habit id
 let persisted = null;
 let range = 30;         // stats range in days
 let celebrate = false;  // play the "all done" animation on next render
+let lit = null;         // habit just ticked on: its flame plays the ignite animation once
 // per-device UI state (not synced): which yesterday was already reviewed
 const UI_KEY = 'habits-ui';
 const ui = JSON.parse(localStorage.getItem(UI_KEY) || '{}');
@@ -447,17 +480,21 @@ function habitRow(h, paused) {
   const done = L.isDone(data, h.id, viewDay);
   const weekly = h.freq.kind === 'weekly';
   const bonus = h.freq.kind === 'days' && !L.isScheduled(h, viewDay);
-  const sub = [h.note, weekly ? `${L.weekCount(data, h, viewDay)}/${h.freq.times} this week` : '', bonus ? freqText(h.freq) : ''].filter(Boolean).join(' · ');
+  const early = viewDay < h.created; // added after this day — still loggable
+  const sub = [h.note, weekly ? `${L.weekCount(data, h, viewDay)}/${h.freq.times} this week` : '', bonus ? freqText(h.freq) : '',
+    early && !done ? 'Added later — tick to log this day' : ''].filter(Boolean).join(' · ');
   // streak flame: lit once done today, grey while today's tick is still missing ("keep it alive")
-  const st = bonus ? 0 : L.streak(data, h, today());
+  const st = bonus || early ? 0 : L.streak(data, h, today());
   const hot = viewDay !== today() || done || (weekly && !L.isDue(data, h, viewDay)); // weekly target already met = safe
   const unit = weekly ? 'week' : 'day';
-  return `<li><button class="habit ${done ? 'done' : ''} ${weekly && !L.isDue(data, h, viewDay) ? 'met' : ''}"
+  const ignite = lit === h.id && done && !calm(); // just ticked: the flame catches fire
+  const embers = ignite ? [-9, -3, 3, 9].map((dx, i) => `<i class="ember" style="--dx:${dx}px;animation-delay:${i * 60}ms"></i>`).join('') : '';
+  return `<li><button class="habit ${done ? 'done' : ''} ${ignite ? 'ignite' : ''} ${early && !done ? 'early' : ''} ${weekly && !L.isDue(data, h, viewDay) ? 'met' : ''}"
     data-act="toggle" data-id="${esc(h.id)}" aria-pressed="${done}" ${paused ? 'disabled' : ''}>
     <span class="box">${done ? CHECK : ''}</span>
     <span class="txt"><span class="name">${esc(h.name)}</span>${sub ? `<span class="note">${esc(sub)}</span>` : ''}</span>
     ${bonus && done ? '<span class="tag" style="margin-left:auto">Bonus</span>' : ''}
-    ${st ? `<span class="streak tc${tierOf(st)} ${hot ? '' : 'cold'}" title="${st}-${unit} streak · ${TIERS[tierOf(st)].name}${hot ? '' : ' — tick to keep it'}">${flame(st)}${st}</span>` : ''}
+    ${st ? `<span class="streak tc${tierOf(st)} ${hot ? '' : 'cold'} ${ignite ? 'ignite' : ''}" title="${st}-${unit} streak · ${TIERS[tierOf(st)].name}${hot ? '' : ' — tick to keep it'}">${flame(st)}<b>${st}</b>${embers}</span>` : ''}
   </button></li>`;
 }
 
@@ -465,7 +502,8 @@ function renderToday() {
   const t = today(), y = L.addDays(t, -1);
   if (viewDay > t) viewDay = t;
   const paused = L.isPaused(data, viewDay);
-  const active = data.habits.filter(h => !h.archived && h.created <= viewDay);
+  // habits added later still show on past days, so you can log them (ticking moves their start date back)
+  const active = data.habits.filter(h => !h.archived);
   const planned = active.filter(h => h.freq.kind !== 'days' || L.isScheduled(h, viewDay));
   const other = active.filter(h => !planned.includes(h));
   const s = L.dayScore(data, viewDay);
@@ -532,17 +570,28 @@ function renderStats() {
       <td class="${w ? 'weak' : ''}">${w ? `${WD[w.day]} <span class="muted">${Math.round(w.rate * 100)}%</span>` : '—'}</td></tr>`;
   }).join('');
 
-  // 12-week overview
+  // 12-week overview: every day is a ring filled by the share done (neutral grey),
+  // a perfect day becomes a solid green disc with a check — the ones worth collecting
   const start = L.addDays(L.weekStart(t), -7 * 11);
+  const C = 2 * Math.PI * 9;
   let cells = ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(d => `<b>${d}</b>`).join('');
+  let perfect12 = 0;
   for (let i = 0; i < 84; i++) {
     const k = L.addDays(start, i);
-    const cls = k === t ? ' today' : '';
-    if (k > t) cells += '<i class="cell future"></i>';
-    else if (L.isPaused(data, k)) cells += `<i class="cell pause${cls}" title="${k} · paused"></i>`;
-    else {
-      const s = L.dayScore(data, k);
-      cells += `<i class="cell${cls}" style="--r:${s.total ? s.done / s.total : 0}" title="${k} · ${s.done}/${s.total}"></i>`;
+    const now = k === t ? ' today' : '';
+    const open = `data-act="open" data-day="${k}"`;
+    if (k > t) { cells += '<i class="rg future"></i>'; continue; }
+    if (L.isPaused(data, k)) { cells += `<button class="rg paused${now}" ${open} title="${label(k)} · paused"></button>`; continue; }
+    const s = L.dayScore(data, k);
+    if (!s.total) { cells += `<button class="rg rest${now}" ${open} title="${label(k)} · nothing planned"></button>`; continue; }
+    const p = s.done / s.total;
+    if (p === 1) {
+      perfect12++;
+      cells += `<button class="rg full${now}" ${open} style="--i:${i}" title="${label(k)} · all ${s.total} done">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle class="disc" cx="12" cy="12" r="11"/><path class="ck" d="M7.4 12.4l3.1 3.1 6.1-6.6"/></svg></button>`;
+    } else {
+      cells += `<button class="rg part${now}" ${open} style="--p:${p.toFixed(2)}" title="${label(k)} · ${s.done}/${s.total} (${Math.round(p * 100)} %)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle class="tr" cx="12" cy="12" r="9"/>${s.done ? `<circle class="arc" cx="12" cy="12" r="9" stroke-dasharray="${(p * C).toFixed(2)} ${C.toFixed(2)}"/>` : ''}</svg></button>`;
     }
   }
 
@@ -562,7 +611,14 @@ function renderStats() {
     <table><tr><th>Habit</th><th>Streak</th><th>Best</th><th>${range} d</th><th>Most missed</th></tr>${rows}</table>
     <p class="muted">Streak counts scheduled days in a row (weeks for flexible habits). Paused and unscheduled days are skipped; today doesn't count against you until it's over. "Most missed" shows a weekday that clearly stands out — skipped at least 35 % of the time over the last 90 days.</p>
     <h2>Last 12 weeks</h2>
-    <div class="heat">${cells}</div>`;
+    <p class="muted" style="margin-top:-4px">${perfect12 ? `<b style="color:var(--accent)">${perfect12}</b> perfect day${perfect12 === 1 ? '' : 's'} collected. ` : ''}Tap a day to open it.</p>
+    <div class="heat">${cells}</div>
+    <div class="legend">
+      <span><i class="lg full"></i>Perfect day</span>
+      <span><i class="lg part"></i>Partly done (ring = share done)</span>
+      <span><i class="lg rest"></i>Nothing planned</span>
+      <span><i class="c paused"></i>Paused</span>
+    </div>`;
 }
 
 // ---- Plan: 8 columns (Every day + Mon..Sun), flexible habits below ----
@@ -671,6 +727,7 @@ function render() {
     else { const tc = nb.querySelector('.col.today'); if (tc && nb.scrollWidth > nb.clientWidth) nb.scrollLeft = tc.offsetLeft - nb.offsetLeft - 16; }
   }
   celebrate = false;
+  lit = null;
 }
 
 // ---- celebrations ----
@@ -826,6 +883,7 @@ document.addEventListener('click', ev => {
       save();
       const after = L.dayScore(data, viewDay), streakAfter = L.streak(data, h, t);
       const unit = h.freq.kind === 'weekly' ? 'week' : 'day';
+      if (L.isDone(data, id, viewDay)) lit = id;
       celebrate = !L.isPaused(data, viewDay) && after.total > 0 && after.done === after.total && before.done !== before.total;
       if (streakAfter > streakBefore && streakAfter >= 7 && TIERS.some(x => x.at === streakAfter) && once(`tier|${id}|${streakAfter}`)) {
         queue.push({ kind: 'tier', n: streakAfter, name: h.name, unit });
