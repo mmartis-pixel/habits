@@ -274,4 +274,52 @@ assert.notStrictEqual(L.newId(), L.newId());
   assert.strictEqual(gym.created, '2026-11-20');
 }
 
+// --- percent over any window + monthly stats ---
+{
+  const a = daily('2026-10-01'), b = daily('2026-10-01'); b.id = 'b'; b.name = 'B';
+  const done = { d: [], b: [] };
+  for (let k = '2026-10-01'; k <= '2026-10-31'; k = L.addDays(k, 1)) {
+    done.d.push(k);                                  // A every day in October
+    if (k <= '2026-10-15') done.b.push(k);           // B only first half
+  }
+  const d = data([a, b], done, ['2026-10-20']);       // one paused day
+  assert.strictEqual(L.percentBetween(d, a, '2026-10-01', '2026-10-31', T), 100);
+  assert.strictEqual(L.percentBetween(d, b, '2026-10-01', '2026-10-31', T), 50); // 15 of 30 (pause skipped)
+  const m = L.monthStats(d, '2026-10', T);
+  assert.strictEqual(m.days, 31);
+  assert.strictEqual(m.perfect, 15);                  // 1–15
+  assert.strictEqual(m.bestRun, 15);
+  assert.strictEqual(m.checkins, 31 + 15);
+  assert.strictEqual(m.completion, Math.round(45 / 60 * 100)); // done/planned without the paused day
+  assert.strictEqual(m.best.name, 'D');
+  assert.strictEqual(m.worst.name, 'B');
+  assert.strictEqual(L.monthStats(d, '2026-12', T), null);     // future month
+  assert.strictEqual(L.monthStats(d, '2026-11', T).days, 19);  // current month counts up to today
+}
+
+// --- achievements ---
+{
+  const ach = d => Object.fromEntries(L.achievements(d, T).map(x => [x.id, x]));
+  const empty = ach(data([daily()]));
+  assert.ok(!empty.first.unlocked && empty.c100.progress === 0 && empty.c100.need === 100);
+  const h = daily('2026-11-01');
+  const days = []; for (let k = '2026-11-01'; k <= '2026-11-12'; k = L.addDays(k, 1)) days.push(k); // 12 perfect days
+  const d = data([h], { d: [...days, '2026-11-16', '2026-11-17'] });                                    // 13–15 off, then back
+  const a = ach(d);
+  assert.ok(a.first.unlocked && a.perfect1.unlocked && a.week.unlocked && a.ember.unlocked);
+  assert.ok(!a.blue.unlocked && a.blue.progress === 12);
+  assert.ok(a.comeback.unlocked);                                   // perfect day after 3 days without one
+  assert.strictEqual(a.c100.progress, 14);
+  // early bird: a perfect day whose last tick happened before 9:00 that morning
+  const e = data([daily(T)]);
+  L.toggle(e, 'd', T, new Date(2026, 10, 19, 7, 30).getTime());
+  assert.ok(ach(e).early.unlocked);
+  const late = data([daily(T)]);
+  L.toggle(late, 'd', T, new Date(2026, 10, 19, 21, 0).getTime());
+  assert.ok(!ach(late).early.unlocked);
+  // full week planned
+  const plan = data([{ ...daily(), freq: { kind: 'days', days: [0, 1, 2, 3, 4] } }, { ...weekly(1), id: 'x', freq: { kind: 'days', days: [5, 6] } }]);
+  assert.ok(ach(plan).planner.unlocked);
+}
+
 console.log('all tests passed');

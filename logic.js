@@ -168,11 +168,11 @@
     return best;
   }
 
-  function percent(data, habit, today, days) {
+  // % done between two days (inclusive). Today only counts once it's done.
+  function percentBetween(data, habit, from, to, today) {
     const weekly = habit.freq.kind === 'weekly';
     let elig = 0, done = 0;
-    for (let i = 0; i < days; i++) {
-      const k = addDays(today, -i);
+    for (let k = from; k <= to; k = addDays(k, 1)) {
       if (!(weekly ? eligible : counts)(data, habit, k)) continue;
       const d = isDone(data, habit.id, k);
       if (k === today && !d) continue; // today not over yet
@@ -182,6 +182,76 @@
     if (!elig) return null;
     const expected = elig * (weekly ? habit.freq.times / 7 : 1);
     return Math.min(100, Math.round(done / expected * 100));
+  }
+  const percent = (data, habit, today, days) => percentBetween(data, habit, addDays(today, -(days - 1)), today, today);
+
+  // Calendar month ('YYYY-MM') summary up to today; null for a future month.
+  function monthStats(data, ym, today) {
+    const first = `${ym}-01`;
+    if (first > today) return null;
+    const [y, m] = ym.split('-').map(Number);
+    const end = fmt(new Date(Date.UTC(y, m, 0)));
+    const last = end < today ? end : today;
+    let days = 0, perfect = 0, run = 0, bestRun = 0, checkins = 0, planned = 0, done = 0;
+    for (let k = first; k <= last; k = addDays(k, 1)) {
+      days++;
+      checkins += (data.log[k] || []).length;
+      if (isPaused(data, k)) continue;
+      const s = dayScore(data, k);
+      planned += s.total; done += s.done;
+      if (s.total && s.done === s.total) { perfect++; bestRun = Math.max(bestRun, ++run); }
+      else if (s.total && k !== today) run = 0;
+    }
+    const ranked = data.habits.filter(h => !h.archived && h.created <= last)
+      .map(h => ({ id: h.id, name: h.name, pct: percentBetween(data, h, h.created > first ? h.created : first, last, today) }))
+      .filter(x => x.pct !== null).sort((a, b) => b.pct - a.pct);
+    const worst = ranked.length > 1 && ranked[ranked.length - 1].pct < ranked[0].pct ? ranked[ranked.length - 1] : null;
+    return { ym, days, perfect, bestRun, checkins, completion: planned ? Math.round(done / planned * 100) : null, best: ranked[0] || null, worst };
+  }
+
+  // Badges, all derived from the data (nothing stored): { id, name, desc, need, progress, unlocked }
+  function achievements(data, today) {
+    const ids = new Set(data.habits.map(h => h.id));
+    let checkins = 0;
+    for (const v of Object.values(data.log)) checkins += v.filter(id => ids.has(id)).length;
+    const first = data.habits.reduce((m, h) => (!m || h.created < m ? h.created : m), null);
+    let perfectDays = 0, run = 0, bestRun = 0, off = 0, comeback = false, early = false;
+    for (let k = first; first && k <= today; k = addDays(k, 1)) {
+      if (isPaused(data, k) || !dayScore(data, k).total) continue;
+      if (isPerfect(data, k)) {
+        perfectDays++; bestRun = Math.max(bestRun, ++run);
+        if (off >= 3) comeback = true;
+        off = 0;
+        if (!early) { // finished the whole day before 9:00 that morning
+          const lastTick = Math.max(0, ...(data.log[k] || []).map(id => (data.stamps || {})[`${k}|${id}`] || 0));
+          if (lastTick && dayKey(new Date(lastTick)) === k && new Date(lastTick).getHours() < 9) early = true;
+        }
+      } else if (k !== today) { run = 0; off++; }
+    }
+    const bestHabit = Math.max(0, ...data.habits.map(h => bestStreak(data, h, today)));
+    let bestMonth = 0;
+    for (let ym = first && first.slice(0, 7); ym && ym < today.slice(0, 7); ym = addDays(`${ym}-28`, 7).slice(0, 7)) {
+      bestMonth = Math.max(bestMonth, monthStats(data, ym, today).completion || 0);
+    }
+    const planned = new Set();
+    for (const h of data.habits) if (!h.archived) (h.freq.kind === 'daily' ? [0, 1, 2, 3, 4, 5, 6] : h.freq.kind === 'days' ? h.freq.days : []).forEach(d => planned.add(d));
+    const A = (id, name, desc, have, need) => ({ id, name, desc, need, progress: Math.min(have, need), unlocked: have >= need });
+    return [
+      A('first', 'First step', 'Log your first habit', checkins, 1),
+      A('perfect1', 'Perfect day', 'Finish everything planned for a day', perfectDays, 1),
+      A('week', 'Perfect week', '7 perfect days in a row', bestRun, 7),
+      A('early', 'Early bird', 'A perfect day finished before 9:00', early ? 1 : 0, 1),
+      A('comeback', 'Comeback', 'A perfect day after 3+ days without one', comeback ? 1 : 0, 1),
+      A('planner', 'Full week', 'Habits planned on all 7 days', planned.size, 7),
+      A('ember', 'Ember', 'A 7-day streak on any habit', bestHabit, 7),
+      A('blue', 'Blue flame', 'A 30-day streak on any habit', bestHabit, 30),
+      A('gold', 'Golden flame', 'A 100-day streak on any habit', bestHabit, 100),
+      A('legend', 'Legend', 'A 365-day streak on any habit', bestHabit, 365),
+      A('c100', 'Century', '100 check-ins', checkins, 100),
+      A('c500', 'Committed', '500 check-ins', checkins, 500),
+      A('c1000', 'Unstoppable', '1,000 check-ins', checkins, 1000),
+      A('month90', 'Strong month', '90 % or more over a whole month', bestMonth, 90),
+    ];
   }
 
   // What one habit looked like on one day — drives the stats grid.
@@ -241,7 +311,7 @@
   }
 
   const api = { dayKey, addDays, weekStart, dow, isScheduled, isDone, isPaused, toggle, togglePause, merge, deleteHabit, weekCount, isDue, dayScore, isPerfect, perfectStreak,
-    streak, bestStreak, percent, cellStatus, weakDay, validate, newId, defaultData };
+    streak, bestStreak, percent, percentBetween, monthStats, achievements, cellStatus, weakDay, validate, newId, defaultData };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.HabitLogic = api;
 })(this);

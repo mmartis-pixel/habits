@@ -45,23 +45,30 @@
   .heat { display: grid; grid-template-rows: repeat(7, 1fr); grid-auto-flow: column; grid-auto-columns: 1fr; gap: 5px; }
   .heat b { font-size: .7rem; color: var(--muted); font-weight: 500; display: grid; place-items: center; }
   /* day rings: grey arc = share done; perfect day = green disc with check */
-  .rg { aspect-ratio: 1; display: grid; place-items: center; padding: 0; border: 0; background: none; border-radius: 50%; }
-  .rg svg { width: 100%; height: 100%; overflow: visible; }
-  .rg .tr { fill: none; stroke: #262a33; stroke-width: 3; }
-  .rg .arc { fill: none; stroke: #9aa3b2; stroke-width: 3; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 12px 12px;
-    opacity: calc(.45 + var(--p) * .55); }
-  .rg.full .disc { fill: url(#perfectGrad); filter: drop-shadow(0 0 3px rgb(52 211 153 / .55)); }
-  .rg.full .ck { fill: none; stroke: #053b2a; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
-  .rg.full svg { animation: disc-in .45s cubic-bezier(.2, 1.6, .4, 1) both; animation-delay: calc(var(--i) * 8ms); }
+  .cal12 { display: grid; grid-template-columns: 40px repeat(7, minmax(0, 1fr)); gap: 6px 4px; align-items: center; justify-items: center; }
+  .cal12 b { font-size: .7rem; color: var(--muted); font-weight: 500; }
+  .cal12 .wk { font-size: .66rem; color: var(--muted); white-space: nowrap; justify-self: start; }
+  .rg { position: relative; width: 100%; max-width: 44px; aspect-ratio: 1; display: grid; place-items: center; padding: 0; border: 0; background: none; border-radius: 50%; }
+  .rg svg { width: 100%; height: 100%; overflow: visible; grid-area: 1 / 1; }
+  .rg .tr { fill: none; stroke: #23262e; stroke-width: 3.5; }
+  .rg .arc { fill: none; stroke: var(--rc); stroke-width: 3.5; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 20px 20px;
+    animation: arc-in .7s cubic-bezier(.3, 0, .2, 1) both; }
+  @keyframes arc-in { from { stroke-dasharray: 0 107; } }
+  .rg .ct { grid-area: 1 / 1; font-size: .64rem; font-weight: 700; color: var(--rc); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .rg.full .disc { fill: url(#perfectGrad); filter: drop-shadow(0 0 4px rgb(52 211 153 / .55)); }
+  .rg.full .ck { fill: none; stroke: #053b2a; stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; }
+  .rg.full svg { animation: disc-in .45s cubic-bezier(.2, 1.6, .4, 1) both; animation-delay: calc(var(--i) * 7ms); }
   @keyframes disc-in { from { transform: scale(.3); opacity: 0; } }
-  .rg.rest::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: #2a2e37; }
-  .rg.paused { background: repeating-linear-gradient(45deg, #2a2e37 0 3px, #1c1f26 3px 6px); transform: scale(.8); }
+  .rg.rest::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: #2a2e37; grid-area: 1 / 1; }
+  .rg.paused { background: repeating-linear-gradient(45deg, #2a2e37 0 3px, #1c1f26 3px 6px); transform: scale(.78); }
   .rg.today { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--muted); }
+  .rg.sm { max-width: 26px; }
   .legend .lg { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -2px; margin-right: 5px; }
   .lg.full { background: linear-gradient(#6ee7b7, #10b981); box-shadow: 0 0 4px rgb(52 211 153 / .6); }
-  .lg.part { border: 2.5px solid #262a33; border-top-color: #9aa3b2; border-right-color: #9aa3b2; }
+  .legend .lg.grad { width: 46px; border-radius: 6px; height: 8px; vertical-align: 0;
+    background: linear-gradient(90deg, hsl(0 85% 58%), hsl(14 85% 58%), hsl(30 85% 58%), hsl(50 85% 58%), hsl(88 85% 58%), hsl(140 85% 58%)); }
   .lg.rest { background: radial-gradient(circle, #2a2e37 2px, transparent 2.5px); }
-  @media (prefers-reduced-motion: reduce) { .rg.full svg { animation: none; } }
+  body.still *, body.still *::before, body.still *::after { animation: none !important; transition: none !important; }
 
   table { width: 100%; border-collapse: collapse; }
   td, th { padding: 10px 4px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
@@ -235,11 +242,78 @@
   .wd.now span { color: var(--text); font-weight: 700; }
   .wd.now i { animation: now-pop .6s cubic-bezier(.2, 1.6, .4, 1) 1s both; box-shadow: 0 0 0 4px rgb(52 211 153 / .25); }
   @keyframes now-pop { from { transform: scale(.3); } }
-  @media (prefers-reduced-motion: reduce) {
-    .cel-rays, .flame.big { animation: none !important; }
-    .ring .fg, .ring .ck { animation-duration: .01s !important; animation-delay: 0s !important; }
-  }
+  /* "calm" = big motion off (rotating rays, breathing flame); small effects stay. Set by Settings → Effects */
+  body.calm .cel-rays, body.calm .flame.big { animation: none !important; }
   .row button.danger { color: #f87171; border-color: rgb(248 113 113 / .4); }
+  .btn.link { background: none; border: 0; color: var(--muted); margin-top: 6px; padding: 8px; }
+  #toast .ti { display: block; margin: 0 auto 6px; width: 34px; height: 34px; color: var(--accent); }
+  #toast .ti svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  #toast .ti svg text { fill: currentColor; stroke: none; font: 800 8px system-ui; }
+
+  /* sheets: history + monthly review */
+  .x { border: 0; background: none; color: var(--muted); font-size: 1.6rem; line-height: 1; padding: 2px 6px; }
+  .hs-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .hs-head h3 { margin: 0; font-size: 1.2rem; }
+  .hs-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 14px 0 6px; }
+  .hs-stats div { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 8px 4px; text-align: center; }
+  .hs-stats b { display: flex; justify-content: center; align-items: center; gap: 3px; font-size: 1.1rem; }
+  .hs-stats .hs-st { color: var(--tc); }
+  .hs-stats span { font-size: .7rem; color: var(--muted); }
+  .hs-month { display: flex; align-items: center; justify-content: space-between; margin: 10px 0 6px; }
+  .hs-month button { width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); font-size: 1.3rem; }
+  .hs-month button:disabled { opacity: .3; }
+  .hcal, .rv-cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; justify-items: center; }
+  .hcal b, .rv-cal b { font-size: .7rem; color: var(--muted); font-weight: 500; }
+  .hc { width: 100%; max-width: 42px; aspect-ratio: 1; border-radius: 50%; border: 1.5px solid transparent; background: none; color: var(--muted);
+    font-size: .85rem; font-weight: 600; display: grid; place-items: center; font-style: normal; padding: 0; }
+  .hc.done { background: linear-gradient(#6ee7b7, #10b981); color: #053b2a; box-shadow: 0 0 6px rgb(52 211 153 / .4); }
+  .hc.missed { border-color: rgb(248 113 113 / .7); color: #fca5a5; }
+  .hc.pending { border-color: var(--muted); color: var(--text); }
+  .hc.bonus { border-color: rgb(52 211 153 / .6); color: var(--accent); }
+  .hc.paused { background: repeating-linear-gradient(45deg, #2a2e37 0 3px, #1c1f26 3px 6px); }
+  .hc.off, .hc.none, .hc.future { color: #3a404c; }
+  .hc.today { outline: 2px solid var(--text); outline-offset: 2px; }
+  .rv-top { display: flex; align-items: center; gap: 16px; margin-top: 8px; }
+  .rv-ring { width: 120px; height: 120px; flex: none; }
+  .rv-ring .tr { fill: none; stroke: #23262e; stroke-width: 10; }
+  .rv-ring .arc { fill: none; stroke: var(--rc); stroke-width: 10; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 55px 55px;
+    animation: arc-big 1s cubic-bezier(.3, 0, .2, 1) both; }
+  @keyframes arc-big { from { stroke-dasharray: 0 290; } }
+  .rv-ring text { fill: var(--text); font: 800 22px system-ui; }
+  .rv-stats { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+  .rv-stats b { display: block; font-size: 1.3rem; }
+  .rv-stats span { font-size: .75rem; color: var(--muted); }
+  .rv-stats .up b { color: var(--accent); } .rv-stats .down b { color: #f87171; }
+  .rv-verdict { margin: 12px 0; font-weight: 600; }
+  .rv-cal { gap: 5px; margin-bottom: 10px; }
+  .rv-cal .rg { max-width: 30px; }
+  .rv-row { display: flex; align-items: baseline; gap: 8px; padding: 9px 0; border-top: 1px solid var(--line); }
+  .rv-row span { color: var(--muted); font-size: .8rem; min-width: 110px; }
+  .rv-row b { flex: 1; font-weight: 600; }
+  .rv-row em { font-style: normal; font-weight: 700; }
+  .hsheet .btns, .rsheet .btns { margin-top: 12px; display: flex; gap: 8px; }
+  .hsheet .btns .btn, .rsheet .btns .btn { margin: 0; }
+  .sheet.hsheet, .sheet.rsheet { background: var(--card); border: 1px solid var(--line); display: block; }
+  .mrev { width: 100%; display: flex; align-items: center; justify-content: space-between; text-align: left; margin-bottom: 12px; padding: 14px 16px;
+    border-radius: 16px; border: 1px solid rgb(52 211 153 / .35); background: linear-gradient(135deg, rgb(52 211 153 / .12), rgb(59 130 246 / .06)); }
+  .mrev b { display: block; }
+  .mrev em { font-style: normal; font-size: .82rem; color: var(--muted); }
+  .mrev i { font-style: normal; font-size: 1.5rem; color: var(--accent); }
+  .hlink { border: 0; background: none; padding: 0; text-align: left; font-weight: 500; text-decoration: underline; text-decoration-color: #3a404c; text-underline-offset: 3px; }
+
+  /* achievements: muted line icons, colour only once earned */
+  .badges { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .badge { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 8px 10px; text-align: center; overflow: hidden; }
+  .badge i { display: grid; place-items: center; width: 44px; height: 44px; margin: 0 auto 6px; border-radius: 50%; border: 1.5px solid #2f343e; color: #4b5260; }
+  .badge i svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .badge i svg text { fill: currentColor; stroke: none; font: 800 8px system-ui; }
+  .badge i .flame { width: 24px; height: 24px; filter: grayscale(1) opacity(.45); animation: none; }
+  .badge b { display: block; font-size: .8rem; }
+  .badge span { display: block; font-size: .68rem; color: var(--muted); line-height: 1.3; margin-top: 2px; }
+  .badge u { position: absolute; left: 0; bottom: 0; height: 3px; width: calc(var(--p) * 100%); background: #3a404c; }
+  .badge.on { border-color: rgb(52 211 153 / .3); }
+  .badge.on i { color: var(--accent); border-color: rgb(52 211 153 / .55); box-shadow: 0 0 12px rgb(52 211 153 / .15) inset; }
+  .badge.on i .flame { filter: drop-shadow(0 0 3px var(--glow)); }
 
   /* toast + confetti */
   #toast { position: fixed; left: 50%; top: 30%; transform: translate(-50%, 12px) scale(.96); opacity: 0; pointer-events: none; z-index: 30; min-width: 220px;
@@ -487,7 +561,7 @@ function habitRow(h, paused) {
   const st = bonus || early ? 0 : L.streak(data, h, today());
   const hot = viewDay !== today() || done || (weekly && !L.isDue(data, h, viewDay)); // weekly target already met = safe
   const unit = weekly ? 'week' : 'day';
-  const ignite = lit === h.id && done && !calm(); // just ticked: the flame catches fire
+  const ignite = lit === h.id && done && !still(); // just ticked: the flame catches fire
   const embers = ignite ? [-9, -3, 3, 9].map((dx, i) => `<i class="ember" style="--dx:${dx}px;animation-delay:${i * 60}ms"></i>`).join('') : '';
   return `<li><button class="habit ${done ? 'done' : ''} ${ignite ? 'ignite' : ''} ${early && !done ? 'early' : ''} ${weekly && !L.isDue(data, h, viewDay) ? 'met' : ''}"
     data-act="toggle" data-id="${esc(h.id)}" aria-pressed="${done}" ${paused ? 'disabled' : ''}>
@@ -565,37 +639,29 @@ function renderStats() {
   const rows = habits.map(h => {
     const unit = h.freq.kind === 'weekly' ? ' wk' : '';
     const w = L.weakDay(data, h, t);
-    return `<tr><td>${esc(h.name)}<div class="muted">${esc(freqText(h.freq))}</div></td>
+    return `<tr><td><button class="hlink" data-act="detail" data-id="${esc(h.id)}">${esc(h.name)}</button><div class="muted">${esc(freqText(h.freq))}</div></td>
       <td class="st">${L.streak(data, h, t) ? flame(L.streak(data, h, t)) : ''}${L.streak(data, h, t)}${unit}</td><td>${L.bestStreak(data, h, t)}${unit}</td><td>${pct(L.percent(data, h, t, range))}</td>
       <td class="${w ? 'weak' : ''}">${w ? `${WD[w.day]} <span class="muted">${Math.round(w.rate * 100)}%</span>` : '—'}</td></tr>`;
   }).join('');
 
-  // 12-week overview: every day is a ring filled by the share done (neutral grey),
-  // a perfect day becomes a solid green disc with a check — the ones worth collecting
+  // 12 weeks as a calendar (rows = weeks): every day is a ring coloured by how much got done
+  // (red → orange → yellow → green) with "done/planned" inside; a perfect day is a green disc with a check
   const start = L.addDays(L.weekStart(t), -7 * 11);
-  const C = 2 * Math.PI * 9;
-  let cells = ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(d => `<b>${d}</b>`).join('');
+  let cells = '<span></span>' + ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(d => `<b>${d}</b>`).join('');
   let perfect12 = 0;
   for (let i = 0; i < 84; i++) {
     const k = L.addDays(start, i);
-    const now = k === t ? ' today' : '';
-    const open = `data-act="open" data-day="${k}"`;
-    if (k > t) { cells += '<i class="rg future"></i>'; continue; }
-    if (L.isPaused(data, k)) { cells += `<button class="rg paused${now}" ${open} title="${label(k)} · paused"></button>`; continue; }
-    const s = L.dayScore(data, k);
-    if (!s.total) { cells += `<button class="rg rest${now}" ${open} title="${label(k)} · nothing planned"></button>`; continue; }
-    const p = s.done / s.total;
-    if (p === 1) {
-      perfect12++;
-      cells += `<button class="rg full${now}" ${open} style="--i:${i}" title="${label(k)} · all ${s.total} done">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle class="disc" cx="12" cy="12" r="11"/><path class="ck" d="M7.4 12.4l3.1 3.1 6.1-6.6"/></svg></button>`;
-    } else {
-      cells += `<button class="rg part${now}" ${open} style="--p:${p.toFixed(2)}" title="${label(k)} · ${s.done}/${s.total} (${Math.round(p * 100)} %)">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle class="tr" cx="12" cy="12" r="9"/>${s.done ? `<circle class="arc" cx="12" cy="12" r="9" stroke-dasharray="${(p * C).toFixed(2)} ${C.toFixed(2)}"/>` : ''}</svg></button>`;
-    }
+    if (i % 7 === 0) cells += `<span class="wk">${Number(k.slice(8))} ${MONTHS[Number(k.slice(5, 7)) - 1]}</span>`;
+    cells += dayRing(k, t, i);
+    if (k <= t && L.isPerfect(data, k)) perfect12++;
   }
 
+  const ms = L.monthStats(data, t.slice(0, 7), t);
+  const badges = L.achievements(data, t), unlocked = badges.filter(a => a.unlocked).length;
   return `
+    <button class="mrev" data-act="mreview">
+      <span><b>${FULLMONTH[Number(t.slice(5, 7)) - 1]} review</b><em>${ms && ms.completion != null ? `${ms.completion}% so far · ${ms.perfect} perfect day${ms.perfect === 1 ? '' : 's'}` : 'See how your month is going'}</em></span>
+      <i>›</i></button>
     <div class="seg">${[7, 30, 90].map(n => `<button data-act="range" data-n="${n}" class="${n === range ? 'on' : ''}">${n} days</button>`).join('')}</div>
     <div class="cards">
       <div class="card"><b>${pct(avg)}</b><span>Completion</span></div>
@@ -609,16 +675,47 @@ function renderStats() {
     <p class="muted">Tap a date to open that day and fix it.</p>` : '<p class="muted">No habits yet.</p>'}
     <h2>Habits</h2>
     <table><tr><th>Habit</th><th>Streak</th><th>Best</th><th>${range} d</th><th>Most missed</th></tr>${rows}</table>
-    <p class="muted">Streak counts scheduled days in a row (weeks for flexible habits). Paused and unscheduled days are skipped; today doesn't count against you until it's over. "Most missed" shows a weekday that clearly stands out — skipped at least 35 % of the time over the last 90 days.</p>
+    <p class="muted">Tap a habit for its full history. Streak counts scheduled days in a row (weeks for flexible habits). Paused and unscheduled days are skipped; today doesn't count against you until it's over. "Most missed" shows a weekday that clearly stands out — skipped at least 35 % of the time over the last 90 days.</p>
     <h2>Last 12 weeks</h2>
     <p class="muted" style="margin-top:-4px">${perfect12 ? `<b style="color:var(--accent)">${perfect12}</b> perfect day${perfect12 === 1 ? '' : 's'} collected. ` : ''}Tap a day to open it.</p>
-    <div class="heat">${cells}</div>
+    <div class="cal12">${cells}</div>
     <div class="legend">
       <span><i class="lg full"></i>Perfect day</span>
-      <span><i class="lg part"></i>Partly done (ring = share done)</span>
+      <span><i class="lg grad"></i>0 % → 99 % done</span>
       <span><i class="lg rest"></i>Nothing planned</span>
       <span><i class="c paused"></i>Paused</span>
-    </div>`;
+    </div>
+    <h2>Achievements <span class="muted">${unlocked} / ${badges.length}</span></h2>
+    <div class="badges">${badges.map(a => `<div class="badge ${a.unlocked ? 'on' : ''}" title="${esc(a.desc)}">
+      <i>${badgeIcon(a)}</i><b>${a.name}</b>
+      <span>${a.unlocked ? a.desc : a.need > 1 ? `${a.progress} / ${a.need}` : a.desc}</span>
+      ${!a.unlocked && a.need > 1 ? `<u style="--p:${a.progress / a.need}"></u>` : ''}</div>`).join('')}</div>`;
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+// red (0 %) → orange (~45 %) → yellow (~66 %) → green (99 %), blended continuously
+function pctColor(p) {
+  const stops = [[0, 0], [.33, 14], [.5, 30], [.66, 50], [.8, 88], [1, 140]];
+  let i = 1;
+  while (i < stops.length - 1 && p > stops[i][0]) i++;
+  const [p0, h0] = stops[i - 1], [p1, h1] = stops[i];
+  return `hsl(${Math.round(h0 + (h1 - h0) * (p - p0) / (p1 - p0))} 85% 58%)`;
+}
+// one day as a ring (used by the 12-week calendar and the monthly review)
+function dayRing(k, t, i = 0, small = false) {
+  const now = k === t ? ' today' : '', sm = small ? ' sm' : '';
+  const open = small ? '' : `data-act="open" data-day="${k}"`;
+  const tag = small ? 'i' : 'button';
+  if (k > t) return `<i class="rg future${sm}"></i>`;
+  if (L.isPaused(data, k)) return `<${tag} class="rg paused${now}${sm}" ${open} title="${label(k)} · paused"></${tag}>`;
+  const s = L.dayScore(data, k);
+  if (!s.total) return `<${tag} class="rg rest${now}${sm}" ${open} title="${label(k)} · nothing planned"></${tag}>`;
+  const p = s.done / s.total, C = 2 * Math.PI * 17;
+  if (p === 1) return `<${tag} class="rg full${now}${sm}" ${open} style="--i:${i}" title="${label(k)} · all ${s.total} done">
+    <svg viewBox="0 0 40 40" aria-hidden="true"><circle class="disc" cx="20" cy="20" r="19"/><path class="ck" d="M12.5 20.5l5 5 10-11"/></svg></${tag}>`;
+  return `<${tag} class="rg part${now}${sm}" ${open} style="--rc:${pctColor(p)}" title="${label(k)} · ${s.done}/${s.total} (${Math.round(p * 100)} %)">
+    <svg viewBox="0 0 40 40" aria-hidden="true"><circle class="tr" cx="20" cy="20" r="17"/>${s.done ? `<circle class="arc" cx="20" cy="20" r="17" stroke-dasharray="${(p * C).toFixed(1)} ${C.toFixed(1)}"/>` : ''}</svg>
+    ${small ? '' : `<span class="ct">${s.done}/${s.total}</span>`}</${tag}>`;
 }
 
 // ---- Plan: 8 columns (Every day + Mon..Sun), flexible habits below ----
@@ -684,6 +781,7 @@ function sheet() {
       <div class="days" role="group" aria-label="Days">${chips}</div>
       <div class="btns"><button class="btn primary" type="submit">${isNew ? 'Add habit' : 'Save'}</button><button class="btn" type="button" data-act="cancel">Cancel</button></div>
       ${isNew ? '' : `<div class="btns secondary">
+        <button class="btn" type="button" data-act="detail" data-id="${esc(e.id)}">History</button>
         <button class="btn" type="button" data-act="up" data-id="${esc(e.id)}">Move up</button>
         <button class="btn" type="button" data-act="down" data-id="${esc(e.id)}">Move down</button>
         <button class="btn" type="button" data-act="archive" data-id="${esc(e.id)}">Archive</button></div>`}
@@ -691,7 +789,13 @@ function sheet() {
 }
 
 function renderSettings() {
+  const seg = (act, cur, opts) => `<div class="seg">${opts.map(([v, t]) => `<button data-act="${act}" data-v="${v}" class="${v === cur ? 'on' : ''}">${t}</button>`).join('')}</div>`;
   return `
+    <h2>Sound</h2>
+    ${seg('setsound', ui.sound === false ? 'off' : 'on', [['on', 'On'], ['off', 'Off']])}
+    <h2>Effects</h2>
+    ${seg('setmotion', ui.motion || 'system', [['system', 'System'], ['full', 'Full'], ['still', 'Still']])}
+    <p class="muted">System: small animations always, big ones (confetti, rays) only if your device doesn't ask for reduced motion. Full: everything. Still: no animation. Saved per device.</p>
     <h2>Backup</h2>
     <p class="muted">Your data lives on this device${sync ? ' and in your private gist' : ' only'}. Last backup: ${data.lastExport ? label(data.lastExport) : 'never'}.
       ${persisted === true ? 'Storage is persistent.' : persisted === false ? 'The browser may clear storage when space runs low — export regularly.' : ''}</p>
@@ -713,9 +817,11 @@ function render() {
   const view = document.getElementById('view');
   const board = document.querySelector('.board');
   const boardScroll = board ? board.scrollLeft : null; // keep the board where it was when the dialog opens/closes
-  view.innerHTML = { today: renderToday, plan: renderPlan, stats: renderStats, settings: renderSettings }[tab]();
+  view.innerHTML = { today: renderToday, plan: renderPlan, stats: renderStats, settings: renderSettings }[tab]()
+    + (detail ? detailSheet() : review ? reviewSheet() : '');
   view.classList.toggle('wide', tab === 'plan');
-  document.body.classList.toggle('locked', !!editing);
+  document.body.classList.toggle('locked', !!(editing || detail || review));
+  applyMotion();
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
   const name = document.querySelector('#hform input[name=name]');
   if (name && !name.value && !document.querySelector('.quick')) name.focus();
@@ -745,10 +851,23 @@ function once(key) {
   ui.cel.keys.push(key); saveUi();
   return true;
 }
-const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Effects (Settings, per device): 'system' = big motion follows the OS setting, small effects always on;
+// 'full' = everything; 'still' = no animation at all
+const calm = () => ui.motion === 'still' || (ui.motion !== 'full' && matchMedia('(prefers-reduced-motion: reduce)').matches);
+const still = () => ui.motion === 'still';
+function applyMotion() {
+  document.body.classList.toggle('calm', calm());
+  document.body.classList.toggle('still', still());
+}
 function nextCelebration() {
   if (document.querySelector('.cel') || !queue.length) return;
   const c = queue.shift();
+  if (c.kind === 'badge') { // achievements: a quiet toast + chime, never a full-screen card
+    toast('Achievement unlocked', c.a.name, badgeIcon(c.a));
+    Sfx.play('badge');
+    return setTimeout(nextCelebration, 2900);
+  }
+  Sfx.play(c.kind === 'tier' ? 'tier' : 'day');
   const el = document.createElement('div');
   el.className = 'cel';
   el.setAttribute('role', 'dialog');
@@ -764,7 +883,7 @@ function nextCelebration() {
 }
 function closeCelebration() {
   document.querySelector('.cel')?.remove();
-  document.body.classList.toggle('locked', !!editing);
+  document.body.classList.toggle('locked', !!(editing || detail || review));
   nextCelebration();
 }
 function tierCard({ n, name, unit }) {
@@ -795,11 +914,12 @@ function dayCard({ ps, tierUp }) {
     <div class="week">${week.join('')}</div>
     <div class="cel-sub">${MESSAGES[Math.floor(Math.random() * MESSAGES.length)]}</div>
     <button class="btn primary" data-act="celclose">Continue</button>
+    <button class="btn link" data-act="share" data-v="streak">Share</button>
   </div>`;
 }
 function countUp(el) {
   const to = Number(el.dataset.to);
-  if (calm() || to < 2) return;
+  if (still() || to < 2) return;
   const from = Math.max(0, to - Math.min(to, 30)), t0 = performance.now(), dur = 700;
   (function step(now) {
     const p = Math.min(1, (now - t0) / dur);
@@ -808,9 +928,9 @@ function countUp(el) {
   })(t0);
 }
 let toastTimer;
-function toast(title, sub = '') {
+function toast(title, sub = '', icon = '') {
   const el = document.getElementById('toast');
-  el.innerHTML = `<b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}`;
+  el.innerHTML = `${icon ? `<i class="ti">${icon}</i>` : ''}<b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}`;
   el.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
@@ -848,6 +968,218 @@ function burst(colors, count) {
   })(t0);
 }
 
+// ---- sounds: synthesized with Web Audio (no files). Each tick climbs a pentatonic scale. ----
+const Sfx = (() => {
+  let ac;
+  const ctx = () => ac || (ac = new (window.AudioContext || window.webkitAudioContext)());
+  function tone(f, at, dur, { type = 'sine', gain = .1, to = 0 } = {}) {
+    const a = ctx(), o = a.createOscillator(), g = a.createGain(), t = a.currentTime + at;
+    o.type = type;
+    o.frequency.setValueAtTime(f, t);
+    if (to) o.frequency.exponentialRampToValueAtTime(to, t + dur);
+    g.gain.setValueAtTime(.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + .012);
+    g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    o.connect(g).connect(a.destination);
+    o.start(t); o.stop(t + dur + .05);
+  }
+  const NOTES = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.51, 1567.98, 1760];
+  const S = {
+    tick: n => { const f = NOTES[Math.min(Math.max(n - 1, 0), NOTES.length - 1)]; tone(f, 0, .18, { type: 'triangle', gain: .16 }); tone(f * 2, .015, .1, { gain: .035 }); },
+    untick: () => tone(440, 0, .13, { gain: .07, to: 300 }),
+    day: () => { [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(f, i * .085, .6, { type: 'triangle', gain: .11 })); tone(2093, .36, .9, { gain: .03 }); },
+    tier: () => { [261.63, 329.63, 392].forEach(f => tone(f, 0, 1.2, { type: 'triangle', gain: .06 }));
+      [783.99, 987.77, 1174.66, 1567.98, 1975.53].forEach((f, i) => tone(f, .18 + i * .07, .45, { gain: .05 })); },
+    badge: () => { tone(1318.51, 0, .3, { type: 'triangle', gain: .07 }); tone(1975.53, .11, .6, { gain: .06 }); },
+    pop: () => tone(880, 0, .08, { type: 'triangle', gain: .06, to: 1250 }),
+    soft: () => tone(660, 0, .07, { gain: .035 }),
+    pause: () => tone(392, 0, .28, { gain: .05, to: 294 }),
+    remove: () => tone(330, 0, .2, { type: 'triangle', gain: .06, to: 196 }),
+  };
+  return { play(name, arg) { if (ui.sound === false) return; try { const a = ctx(); if (a.state === 'suspended') a.resume(); S[name](arg); } catch (e) {} } };
+})();
+
+// ---- habit history: month calendar, every past day editable ----
+const FULLMONTH = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const shiftMonth = (ym, d) => L.addDays(`${ym}-15`, d * 30).slice(0, 7);
+let detail = null; // { id, ym }
+function detailSheet() {
+  const h = data.habits.find(x => x.id === detail.id);
+  if (!h) { detail = null; return ''; }
+  const t = today(), ym = detail.ym, first = `${ym}-01`;
+  const [y, m] = ym.split('-').map(Number);
+  const n = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  let cells = WD.map(d => `<b>${d[0]}</b>`).join('') + '<i></i>'.repeat(L.dow(first));
+  for (let i = 0; i < n; i++) {
+    const k = L.addDays(first, i), st = L.cellStatus(data, h, k, t);
+    cells += k > t ? `<i class="hc future">${i + 1}</i>`
+      : `<button class="hc ${st}${k === t ? ' today' : ''}" data-act="dtoggle" data-day="${k}" title="${label(k)} · ${STATUS[st] || 'before it started'}">${i + 1}</button>`;
+  }
+  const st = L.streak(data, h, t), unit = h.freq.kind === 'weekly' ? ' wk' : '';
+  const p30 = L.percent(data, h, t, 30);
+  const total = Object.values(data.log).filter(v => v.includes(h.id)).length;
+  return `<div class="backdrop" data-act="dclose"></div>
+    <div class="sheet hsheet" role="dialog" aria-modal="true" aria-label="${esc(h.name)} history">
+      <div class="hs-head"><div><h3>${esc(h.name)}</h3><span class="muted">${esc([freqText(h.freq), h.note].filter(Boolean).join(' · '))}</span></div>
+        <button class="x" data-act="dclose" aria-label="Close">×</button></div>
+      <div class="hs-stats tc${tierOf(st)}">
+        <div><b class="hs-st">${st ? flame(st) : ''}${st}${unit}</b><span>Streak</span></div>
+        <div><b>${L.bestStreak(data, h, t)}${unit}</b><span>Best</span></div>
+        <div><b>${p30 == null ? '—' : p30 + '%'}</b><span>30 days</span></div>
+        <div><b>${total}</b><span>Check-ins</span></div>
+      </div>
+      <div class="hs-month"><button data-act="dmonth" data-v="-1" aria-label="Previous month">‹</button><b>${FULLMONTH[m - 1]} ${y}</b>
+        <button data-act="dmonth" data-v="1" aria-label="Next month" ${ym < t.slice(0, 7) ? '' : 'disabled'}>›</button></div>
+      <div class="hcal">${cells}</div>
+      <p class="muted">Tap a day to mark it done or not done.</p>
+    </div>`;
+}
+
+// ---- monthly review ----
+let review = null; // { ym }
+function reviewSheet() {
+  const t = today(), ym = review.ym, s = L.monthStats(data, ym, t);
+  const [y, m] = ym.split('-').map(Number);
+  const p = L.monthStats(data, shiftMonth(ym, -1), t);
+  const delta = s && s.completion != null && p && p.completion != null && p.checkins ? s.completion - p.completion : null;
+  const first = `${ym}-01`, n = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  let cal = WD.map(d => `<b>${d[0]}</b>`).join('') + '<i></i>'.repeat(L.dow(first));
+  for (let i = 0; i < n; i++) cal += dayRing(L.addDays(first, i), t, i, true);
+  const c = s && s.completion != null ? s.completion : 0, R = 46, C = 2 * Math.PI * R;
+  const verdict = !s || s.completion == null ? 'Nothing logged this month yet.' : c >= 90 ? 'Outstanding month.' : c >= 75 ? 'Solid month — keep the rhythm.'
+    : c >= 50 ? 'Halfway there. Next month, a bit more.' : 'A fresh month is a fresh start.';
+  const earliest = data.habits.reduce((mn, h) => (!mn || h.created < mn ? h.created : mn), t).slice(0, 7);
+  return `<div class="backdrop" data-act="rclose"></div>
+    <div class="sheet rsheet" role="dialog" aria-modal="true" aria-label="Monthly review">
+      <div class="hs-head"><div><span class="muted">Monthly review</span><h3>${FULLMONTH[m - 1]} ${y}</h3></div>
+        <button class="x" data-act="rclose" aria-label="Close">×</button></div>
+      <div class="hs-month"><button data-act="rmonth" data-v="-1" aria-label="Previous month" ${ym > earliest ? '' : 'disabled'}>‹</button><b>${ym === t.slice(0, 7) ? 'This month so far' : 'Whole month'}</b>
+        <button data-act="rmonth" data-v="1" aria-label="Next month" ${ym < t.slice(0, 7) ? '' : 'disabled'}>›</button></div>
+      <div class="rv-top">
+        <svg class="rv-ring" viewBox="0 0 110 110" style="--rc:${c === 100 ? 'var(--accent)' : pctColor(c / 100)}"><circle class="tr" cx="55" cy="55" r="${R}"/>
+          <circle class="arc" cx="55" cy="55" r="${R}" stroke-dasharray="${(c / 100 * C).toFixed(1)} ${C.toFixed(1)}"/>
+          <text x="55" y="61" text-anchor="middle">${s && s.completion != null ? c + '%' : '—'}</text></svg>
+        <div class="rv-stats">
+          <div><b>${s ? s.perfect : 0}</b><span>perfect days</span></div>
+          <div><b>${s ? s.bestRun : 0}</b><span>best run</span></div>
+          <div><b>${s ? s.checkins : 0}</b><span>check-ins</span></div>
+          ${delta != null ? `<div class="${delta >= 0 ? 'up' : 'down'}"><b>${delta >= 0 ? '+' : ''}${delta}%</b><span>vs ${FULLMONTH[(m + 10) % 12]}</span></div>` : ''}
+        </div>
+      </div>
+      <p class="rv-verdict">${verdict}</p>
+      <div class="rv-cal">${cal}</div>
+      ${s && s.best ? `<div class="rv-row"><span>Strongest</span><b>${esc(s.best.name)}</b><em>${s.best.pct}%</em></div>` : ''}
+      ${s && s.worst ? `<div class="rv-row"><span>Needs attention</span><b>${esc(s.worst.name)}</b><em>${s.worst.pct}%</em></div>` : ''}
+      <div class="btns"><button class="btn primary" data-act="share" data-v="month">Share image</button><button class="btn" data-act="rclose">Close</button></div>
+    </div>`;
+}
+
+// ---- share image (1080×1920, story size) — Web Share on phones, download elsewhere ----
+const FL_STOPS = [['#ea580c', '#f97316', '#fbbf24'], ['#c2410c', '#f97316', '#fde047'], ['#991b1b', '#ef4444', '#fb923c'], ['#1e3a8a', '#3b82f6', '#67e8f9'],
+  ['#4c1d95', '#a855f7', '#f0abfc'], ['#92400e', '#f59e0b', '#fef08a'], ['#831843', '#ec4899', '#fbcfe8'], ['#6d28d9', '#ec4899', '#f59e0b', '#fef9c3']];
+function drawFlame(g, n, x, y, size) {
+  const t = tierOf(n);
+  g.save(); g.translate(x - size / 2, y - size / 2); g.scale(size / 24, size / 24);
+  const gr = g.createLinearGradient(0, 24, 0, 0);
+  FL_STOPS[t].forEach((c, i, a) => gr.addColorStop(i / (a.length - 1), c));
+  g.shadowColor = FL_STOPS[t][1]; g.shadowBlur = 30;
+  g.fillStyle = gr; g.fill(new Path2D(FLAME_D));
+  g.shadowBlur = 0; g.globalAlpha = .92; g.fillStyle = CORE[t]; g.fill(new Path2D(CORE_D));
+  g.restore();
+}
+function drawRing(g, x, y, r, p, w, perfect) {
+  g.lineCap = 'round';
+  if (perfect) {
+    const gr = g.createLinearGradient(0, y - r, 0, y + r); gr.addColorStop(0, '#6ee7b7'); gr.addColorStop(1, '#10b981');
+    g.fillStyle = gr; g.beginPath(); g.arc(x, y, r + w / 2, 0, 7); g.fill();
+    g.strokeStyle = '#053b2a'; g.lineWidth = w * .9; g.beginPath();
+    g.moveTo(x - r * .42, y + r * .02); g.lineTo(x - r * .1, y + r * .32); g.lineTo(x + r * .45, y - r * .3); g.stroke();
+    return;
+  }
+  g.strokeStyle = '#23262e'; g.lineWidth = w; g.beginPath(); g.arc(x, y, r, 0, 7); g.stroke();
+  if (p > 0) { g.strokeStyle = pctColor(p); g.beginPath(); g.arc(x, y, r, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2); g.stroke(); }
+}
+async function shareImage(kind) {
+  const W = 1080, H = 1920, c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d'), t = today(), font = (w, s) => `${w} ${s}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
+  const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#13161c'); bg.addColorStop(1, '#0b0d11');
+  g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  const glow = g.createRadialGradient(W / 2, 520, 0, W / 2, 520, 700); glow.addColorStop(0, 'rgba(52,211,153,.16)'); glow.addColorStop(1, 'rgba(52,211,153,0)');
+  g.fillStyle = glow; g.fillRect(0, 0, W, H);
+  g.textAlign = 'center'; g.fillStyle = '#8b93a1'; g.font = font(700, 34); g.fillText('H A B I T S', W / 2, 150);
+  let title = '';
+  if (kind === 'streak') {
+    const ps = L.perfectStreak(data, t);
+    title = `${ps}-day streak`;
+    drawFlame(g, ps, W / 2, 560, 420);
+    g.fillStyle = '#e8eaed'; g.font = font(800, 220); g.fillText(String(ps), W / 2, 1010);
+    g.fillStyle = '#8b93a1'; g.font = font(600, 54); g.fillText(`perfect day${ps === 1 ? '' : 's'} in a row`, W / 2, 1090);
+    g.fillStyle = FL_STOPS[tierOf(ps)][2]; g.font = font(700, 40); g.fillText(TIERS[tierOf(ps)].name.toUpperCase(), W / 2, 1170);
+    for (let i = 0; i < 7; i++) {
+      const k = L.addDays(t, i - 6), x = W / 2 + (i - 3) * 130, s = L.dayScore(data, k);
+      drawRing(g, x, 1380, 44, s.total ? s.done / s.total : 0, 12, L.isPerfect(data, k));
+      g.fillStyle = k === t ? '#e8eaed' : '#8b93a1'; g.font = font(600, 30); g.fillText(WD[L.dow(k)].slice(0, 2), x, 1470);
+    }
+  } else {
+    const ym = review ? review.ym : t.slice(0, 7), s = L.monthStats(data, ym, t) || {};
+    const [y, m] = ym.split('-').map(Number), comp = s.completion || 0;
+    title = `${FULLMONTH[m - 1]} ${y}`;
+    g.fillStyle = '#e8eaed'; g.font = font(800, 84); g.fillText(title, W / 2, 290);
+    drawRing(g, W / 2, 560, 190, comp / 100, 34, comp === 100);
+    if (comp < 100) { g.fillStyle = '#e8eaed'; g.font = font(800, 120); g.fillText(`${comp}%`, W / 2, 600); }
+    g.fillStyle = '#8b93a1'; g.font = font(600, 38); g.fillText('completion', W / 2, 820);
+    [[s.perfect || 0, 'perfect days'], [s.bestRun || 0, 'best run'], [s.checkins || 0, 'check-ins']].forEach(([v, l], i) => {
+      const x = W / 2 + (i - 1) * 320;
+      g.fillStyle = '#e8eaed'; g.font = font(800, 84); g.fillText(String(v), x, 980);
+      g.fillStyle = '#8b93a1'; g.font = font(600, 32); g.fillText(l, x, 1030);
+    });
+    const first = `${ym}-01`, n = new Date(Date.UTC(y, m, 0)).getUTCDate(), off = L.dow(first);
+    for (let i = 0; i < n; i++) {
+      const k = L.addDays(first, i), col = (i + off) % 7, row = Math.floor((i + off) / 7);
+      const x = W / 2 + (col - 3) * 112, yy = 1150 + row * 112;
+      if (k > t) { g.fillStyle = '#23262e'; g.beginPath(); g.arc(x, yy, 5, 0, 7); g.fill(); continue; }
+      const sc = L.dayScore(data, k);
+      if (L.isPaused(data, k) || !sc.total) { g.fillStyle = '#2a2e37'; g.beginPath(); g.arc(x, yy, 6, 0, 7); g.fill(); continue; }
+      drawRing(g, x, yy, 36, sc.done / sc.total, 10, sc.done === sc.total);
+    }
+  }
+  g.fillStyle = '#5b6270'; g.font = font(600, 30); g.fillText('Built one day at a time', W / 2, H - 110);
+  const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+  const file = new File([blob], `habits-${kind}-${t}.png`, { type: 'image/png' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title }); return; } catch (e) { if (e.name === 'AbortError') return; }
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = file.name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  toast('Image saved', 'Check your downloads');
+}
+
+// ---- achievements: quiet, derived from data; unlocks announced once per device ----
+const BADGE_ICONS = {
+  first: '<path d="M6 12.5l4 4 8-9"/>',
+  perfect1: '<circle cx="12" cy="12" r="9"/><path d="M8 12.4l2.8 2.8L16.2 9.6"/>',
+  week: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',
+  early: '<path d="M3 18h18M7 18a5 5 0 0 1 10 0M12 8V5M5.2 11.2 3.8 9.8M18.8 11.2l1.4-1.4"/>',
+  comeback: '<path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/>',
+  planner: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
+  month90: '<path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8"/>',
+};
+const BADGE_TEXT = { c100: '100', c500: '500', c1000: '1K' };
+const BADGE_FLAME = { ember: 7, blue: 30, gold: 100, legend: 365 };
+function badgeIcon(a) {
+  if (BADGE_FLAME[a.id]) return flame(BADGE_FLAME[a.id]);
+  if (BADGE_TEXT[a.id]) return `<svg viewBox="0 0 24 24" aria-hidden="true"><text x="12" y="16" text-anchor="middle">${BADGE_TEXT[a.id]}</text></svg>`;
+  return `<svg viewBox="0 0 24 24" aria-hidden="true">${BADGE_ICONS[a.id] || ''}</svg>`;
+}
+function checkBadges() {
+  const list = L.achievements(data, today()), got = list.filter(a => a.unlocked).map(a => a.id);
+  if (!ui.badges) { ui.badges = got; saveUi(); return; } // first run: existing ones count as seen, no flood
+  for (const a of list) if (a.unlocked && !ui.badges.includes(a.id)) { ui.badges.push(a.id); queue.push({ kind: 'badge', a }); }
+  saveUi();
+}
+
 function move(id, dir) {
   const idx = data.habits.findIndex(h => h.id === id);
   let j = idx + dir;
@@ -870,7 +1202,7 @@ function exportData() {
 document.addEventListener('click', ev => {
   const b = ev.target.closest('button, .backdrop, .cel-bg');
   if (!b) return;
-  if (b.dataset.tab) { tab = b.dataset.tab; editing = null; if (tab === 'today') viewDay = today(); return render(); }
+  if (b.dataset.tab) { tab = b.dataset.tab; editing = detail = review = null; if (tab === 'today') viewDay = today(); return render(); }
   const id = b.dataset.id;
   const h = data.habits.find(x => x.id === id);
   switch (b.dataset.act) {
@@ -883,7 +1215,7 @@ document.addEventListener('click', ev => {
       save();
       const after = L.dayScore(data, viewDay), streakAfter = L.streak(data, h, t);
       const unit = h.freq.kind === 'weekly' ? 'week' : 'day';
-      if (L.isDone(data, id, viewDay)) lit = id;
+      if (L.isDone(data, id, viewDay)) { lit = id; Sfx.play('tick', (data.log[viewDay] || []).length); } else Sfx.play('untick');
       celebrate = !L.isPaused(data, viewDay) && after.total > 0 && after.done === after.total && before.done !== before.total;
       if (streakAfter > streakBefore && streakAfter >= 7 && TIERS.some(x => x.at === streakAfter) && once(`tier|${id}|${streakAfter}`)) {
         queue.push({ kind: 'tier', n: streakAfter, name: h.name, unit });
@@ -894,29 +1226,49 @@ document.addEventListener('click', ev => {
         const ps = L.perfectStreak(data, t);
         queue.push({ kind: 'day', ps, tierUp: ps >= 7 && TIERS.some(x => x.at === ps) });
       }
+      checkBadges();
       if (navigator.vibrate && !queue.length) navigator.vibrate(8);
       break;
     }
     case 'celclose': closeCelebration(); return;
     case 'delete': if (h && confirm(`Delete "${h.name}" permanently?\n\nIts whole history will be removed, also on your other synced devices. This can't be undone.`)) {
-      L.deleteHabit(data, id); save();
+      L.deleteHabit(data, id); save(); Sfx.play('remove');
     } break;
     case 'addday': if (h && typeof addCol === 'number') {
       const days = [...h.freq.days, addCol].sort();
       h.freq = days.length === 7 ? { kind: 'daily' } : { kind: 'days', days };
-      h.updated = Date.now(); editing = null; save();
+      h.updated = Date.now(); editing = null; save(); Sfx.play('pop'); checkBadges();
     } break;
+    // sound & effects
+    case 'setsound': ui.sound = b.dataset.v === 'on'; saveUi(); Sfx.play('pop'); break;
+    case 'setmotion': ui.motion = b.dataset.v; saveUi(); break;
+    // habit history
+    case 'detail': editing = null; detail = { id, ym: today().slice(0, 7) }; Sfx.play('soft'); break;
+    case 'dclose': detail = null; break;
+    case 'dmonth': detail.ym = shiftMonth(detail.ym, Number(b.dataset.v)); break;
+    case 'dtoggle': {
+      const k = b.dataset.day;
+      L.toggle(data, detail.id, k); save();
+      Sfx.play(L.isDone(data, detail.id, k) ? 'tick' : 'untick', 3);
+      checkBadges();
+      break;
+    }
+    // monthly review + sharing
+    case 'mreview': review = { ym: today().slice(0, 7) }; Sfx.play('soft'); break;
+    case 'rclose': review = null; break;
+    case 'rmonth': review.ym = shiftMonth(review.ym, Number(b.dataset.v)); break;
+    case 'share': shareImage(b.dataset.v); return;
     case 'review': ui.reviewed = L.addDays(today(), -1); saveUi(); viewDay = ui.reviewed; break;
     case 'dismiss': ui.reviewed = L.addDays(today(), -1); saveUi(); break;
     case 'range': range = Number(b.dataset.n); break;
     case 'open': viewDay = b.dataset.day; tab = 'today'; break;
-    case 'pause': L.togglePause(data, viewDay); save(); break;
+    case 'pause': L.togglePause(data, viewDay); save(); Sfx.play('pause'); break;
     case 'new': editing = 'new'; addCol = /^\d$/.test(b.dataset.col) ? Number(b.dataset.col) : b.dataset.col; break;
     case 'edit': editing = id; break;
     case 'cancel': editing = null; break;
     case 'up': move(id, -1); save(); break;
     case 'down': move(id, 1); save(); break;
-    case 'archive': if (h) { h.archived = !h.archived; h.updated = Date.now(); if (editing === id) editing = null; save(); } break;
+    case 'archive': if (h) { h.archived = !h.archived; h.updated = Date.now(); if (editing === id) editing = null; save(); Sfx.play('soft'); } break;
     case 'export': exportData(); break;
     case 'import': document.getElementById('importFile').click(); return;
     case 'connect': b.disabled = true; b.textContent = 'Connecting…'; connect(document.getElementById('token').value.trim()); return;
@@ -943,15 +1295,18 @@ document.addEventListener('submit', ev => {
   const updated = Date.now();
   if (editing === 'new') data.habits.push({ id: L.newId(), name, note, type: 'check', freq, created: today(), archived: false, updated });
   else Object.assign(data.habits.find(h => h.id === editing), { name, note, freq, updated });
+  Sfx.play(editing === 'new' ? 'pop' : 'soft');
   editing = null;
   save();
+  checkBadges();
   render();
+  nextCelebration();
 });
 
 document.addEventListener('keydown', ev => {
   if (ev.key !== 'Escape') return;
   if (document.querySelector('.cel')) closeCelebration();
-  else if (editing) { editing = null; render(); }
+  else if (editing || detail || review) { editing = detail = review = null; render(); }
 });
 
 // show weekday chips only for "Specific days"
@@ -986,6 +1341,12 @@ window.addEventListener('online', () => syncNow());
 
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().then(ok => { persisted = ok; if (tab === 'settings') render(); });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+checkBadges(); // first run only records what's already unlocked
+// first days of a new month: show last month's review once
+{
+  const t = today(), prev = shiftMonth(t.slice(0, 7), -1), s = L.monthStats(data, prev, t);
+  if (Number(t.slice(8)) <= 7 && ui.lastReview !== prev && s && s.checkins) { review = { ym: prev }; ui.lastReview = prev; saveUi(); }
+}
 render();
 syncNow();
 </script>
