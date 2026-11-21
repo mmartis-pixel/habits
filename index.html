@@ -122,12 +122,73 @@
   .legend i { display: inline-block; width: 12px; height: 12px; vertical-align: -2px; margin-right: 5px; border-radius: 3px; }
   .legend .c { width: 12px; height: 12px; }
   td.weak { color: #f87171; }
+  td.st .flame { margin-right: 3px; }
+
+  /* streak flames */
+  .flame { width: 16px; height: 16px; vertical-align: -3px; flex: none; }
+  .streak { margin-left: auto; display: flex; align-items: center; gap: 2px; font-weight: 700; font-size: .9rem; color: #fbbf24; }
+  .streak.cold { color: var(--muted); }
+  .streak.cold .flame, .pstreak.cold .flame { filter: grayscale(1); opacity: .55; }
+  .habit.done .streak .flame { animation: flicker .5s ease-out; }
+  @keyframes flicker { 0% { transform: scale(.6); } 60% { transform: scale(1.3); } 100% { transform: scale(1); } }
+  .pstreak { display: flex; align-items: center; justify-content: center; gap: 4px; font-size: .8rem; color: #fbbf24; margin-top: 2px; }
+  .pstreak.cold { color: var(--muted); }
+
+  /* toast + confetti */
+  #toast { position: fixed; left: 50%; top: 30%; transform: translate(-50%, 12px) scale(.96); opacity: 0; pointer-events: none; z-index: 30; min-width: 220px;
+    background: var(--card); border: 1px solid var(--accent); border-radius: 16px; padding: 16px 22px; text-align: center; transition: .25s; box-shadow: 0 16px 40px rgb(0 0 0 / .55); }
+  #toast.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  #toast b { display: block; font-size: 1.05rem; }
+  #toast span { color: var(--muted); font-size: .85rem; }
+  #confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 29; }
+
+  /* plan board */
+  main.wide { max-width: 1240px; }
+  h1.title { font-size: 1.35rem; margin: 4px 0 2px; }
+  .board { display: grid; grid-auto-flow: column; grid-auto-columns: 78%; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory;
+    margin: 14px -16px 0; padding: 0 16px 10px; scroll-padding: 0 16px; scrollbar-width: thin; }
+  .col { scroll-snap-align: start; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 8px; min-height: 200px; }
+  .col.today { border-color: rgb(52 211 153 / .6); }
+  .col header { display: flex; align-items: baseline; gap: 8px; padding: 0 2px 2px; }
+  .col header span { color: var(--muted); font-size: .8rem; }
+  .col header em { margin-left: auto; font-style: normal; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--accent); }
+  .pcard { text-align: left; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+  .pcard:hover { border-color: #3a404c; }
+  .pcard .name { font-weight: 600; overflow-wrap: anywhere; }
+  .add { border: 1px dashed var(--line); background: none; color: var(--muted); border-radius: 12px; padding: 10px; }
+  .col .add { margin-top: auto; }
+  .add:hover { color: var(--text); border-color: var(--muted); }
+  .empty-col { margin: 4px 2px; }
+  .flexlist { display: grid; gap: 8px; }
+  @media (min-width: 900px) {
+    .board { grid-auto-flow: row; grid-template-columns: repeat(8, minmax(0, 1fr)); overflow: visible; margin: 14px 0 0; padding: 0; }
+    .flexlist { grid-template-columns: repeat(4, 1fr); }
+  }
+
+  /* dialog */
+  body.locked { overflow: hidden; }
+  .backdrop { position: fixed; inset: 0; background: rgb(0 0 0 / .6); z-index: 20; animation: fade .15s; }
+  .sheet { position: fixed; left: 50%; bottom: 0; transform: translateX(-50%); width: min(560px, 100%); max-height: 92vh; overflow-y: auto; z-index: 21;
+    border-radius: 20px 20px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom)); animation: fade .18s; box-shadow: 0 -10px 40px rgb(0 0 0 / .5); }
+  @media (min-width: 700px) { .sheet { bottom: auto; top: 50%; transform: translate(-50%, -50%); border-radius: 20px; } }
+  @keyframes fade { from { opacity: 0; } }
+  .sheet h3 { margin: 0 0 2px; font-size: 1.15rem; }
+  .rec { color: var(--accent); font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-left: 6px; }
+  .quick { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .qchip { border: 1px solid var(--accent); color: var(--accent); background: none; border-radius: 999px; padding: 7px 13px; font-weight: 600; }
+  .or { text-align: center; color: var(--muted); font-size: .8rem; margin: 2px 0; }
+  .btns.secondary .btn { margin: 0; font-size: .85rem; padding: 10px 6px; color: var(--muted); }
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <linearGradient id="flameGrad" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ea580c"/><stop offset=".6" stop-color="#f97316"/><stop offset="1" stop-color="#fbbf24"/></linearGradient>
+</defs></svg>
 <main id="view"></main>
+<div id="toast" role="status" aria-live="polite"></div>
 <nav>
   <button data-tab="today">Today</button>
+  <button data-tab="plan">Plan</button>
   <button data-tab="stats">Stats</button>
   <button data-tab="settings">Settings</button>
 </nav>
@@ -153,6 +214,8 @@ const ui = JSON.parse(localStorage.getItem(UI_KEY) || '{}');
 const saveUi = () => localStorage.setItem(UI_KEY, JSON.stringify(ui));
 const WD = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const CHECK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+// gradient defined once in <body> (#flameGrad)
+const FLAME = '<svg class="flame" viewBox="0 0 24 24" aria-hidden="true"><path fill="url(#flameGrad)" d="M13.2 1.8c.5 3-1 4.9-2.6 6.6C9 10.1 7 12 7 15.1 7 18.9 9.6 22 12.9 22c3.4 0 6.1-2.9 6.1-6.7 0-2.6-1.2-4.7-2.8-6.3-.1 1.7-.9 3-2.1 3.6.6-3.8-.2-7.6-.9-10.8z"/><path fill="#fde68a" opacity=".9" d="M12.9 21c-1.7 0-3-1.5-3-3.4 0-1.6 1-2.6 1.9-3.6.6-.7 1.1-1.4 1.1-2.5 1.6 1.2 3 3 3 5.4 0 2.3-1.3 4.1-3 4.1z"/></svg>';
 const STATUS = { done: 'done', missed: 'missed', pending: 'not done yet', off: 'not scheduled', bonus: 'done (bonus)', paused: 'paused', none: '' };
 
 function load() {
@@ -275,11 +338,16 @@ function habitRow(h, paused) {
   const weekly = h.freq.kind === 'weekly';
   const bonus = h.freq.kind === 'days' && !L.isScheduled(h, viewDay);
   const sub = [h.note, weekly ? `${L.weekCount(data, h, viewDay)}/${h.freq.times} this week` : '', bonus ? freqText(h.freq) : ''].filter(Boolean).join(' · ');
+  // streak flame: lit once done today, grey while today's tick is still missing ("keep it alive")
+  const st = bonus ? 0 : L.streak(data, h, today());
+  const hot = viewDay !== today() || done || (weekly && !L.isDue(data, h, viewDay)); // weekly target already met = safe
+  const unit = weekly ? 'week' : 'day';
   return `<li><button class="habit ${done ? 'done' : ''} ${weekly && !L.isDue(data, h, viewDay) ? 'met' : ''}"
     data-act="toggle" data-id="${esc(h.id)}" aria-pressed="${done}" ${paused ? 'disabled' : ''}>
     <span class="box">${done ? CHECK : ''}</span>
     <span class="txt"><span class="name">${esc(h.name)}</span>${sub ? `<span class="note">${esc(sub)}</span>` : ''}</span>
     ${bonus && done ? '<span class="tag" style="margin-left:auto">Bonus</span>' : ''}
+    ${st ? `<span class="streak ${hot ? '' : 'cold'}" title="${st}-${unit} streak${hot ? '' : ' — tick to keep it'}">${FLAME}${st}</span>` : ''}
   </button></li>`;
 }
 
@@ -298,7 +366,8 @@ function renderToday() {
   // yesterday left open? (forgot to log vs really missed) — only on today's view, until reviewed
   const open = viewDay === t && ui.reviewed !== y
     ? data.habits.filter(h => !h.archived && L.cellStatus(data, h, y, t) === 'missed').length : 0;
-  const empty = !active.length ? 'No habits yet. Add some in Settings.' : !planned.length ? 'Nothing scheduled for this day.' : '';
+  const empty = !active.length ? 'No habits yet. Add some in Plan.' : !planned.length ? 'Nothing scheduled for this day.' : '';
+  const ps = viewDay === t ? L.perfectStreak(data, t) : 0;
   return `
     ${open ? `<div class="banner info"><span>Yesterday: ${open} not logged</span>
       <button data-act="review">Review</button><button class="x" data-act="dismiss" aria-label="Dismiss">×</button></div>` : ''}
@@ -308,7 +377,8 @@ function renderToday() {
       <div>
         <div class="date">${label(viewDay)}</div>
         <div class="score ${allDone && celebrate ? 'pop' : ''}">${paused ? 'Paused' : `${s.done}/${s.total}`}</div>
-        <div class="sub">${allDone ? 'All done' : ''}</div>
+        <div class="sub">${allDone ? 'Day complete' : ''}</div>
+        ${ps ? `<div class="pstreak ${allDone ? '' : 'cold'}">${FLAME}<b>${ps}</b> perfect day${ps === 1 ? '' : 's'} in a row</div>` : ''}
       </div>
       <button data-act="next" aria-label="Next day" ${viewDay >= t ? 'disabled' : ''}>›</button>
     </header>
@@ -348,7 +418,7 @@ function renderStats() {
     const unit = h.freq.kind === 'weekly' ? ' wk' : '';
     const w = L.weakDay(data, h, t);
     return `<tr><td>${esc(h.name)}<div class="muted">${esc(freqText(h.freq))}</div></td>
-      <td>${L.streak(data, h, t)}${unit}</td><td>${L.bestStreak(data, h, t)}${unit}</td><td>${pct(L.percent(data, h, t, range))}</td>
+      <td class="st">${L.streak(data, h, t) ? FLAME : ''}${L.streak(data, h, t)}${unit}</td><td>${L.bestStreak(data, h, t)}${unit}</td><td>${pct(L.percent(data, h, t, range))}</td>
       <td class="${w ? 'weak' : ''}">${w ? `${WD[w.day]} <span class="muted">${Math.round(w.rate * 100)}%</span>` : '—'}</td></tr>`;
   }).join('');
 
@@ -380,39 +450,78 @@ function renderStats() {
     <p class="muted">Tap a date to open that day and fix it.</p>` : '<p class="muted">No habits yet.</p>'}
     <h2>Habits</h2>
     <table><tr><th>Habit</th><th>Streak</th><th>Best</th><th>${range} d</th><th>Most missed</th></tr>${rows}</table>
-    <p class="muted">Streak counts scheduled days in a row (weeks for weekly habits). Paused and unscheduled days are skipped; today doesn't count against you until it's over. "Most missed" shows a weekday you skip at least 30 % of the time (last 90 days).</p>
+    <p class="muted">Streak counts scheduled days in a row (weeks for flexible habits). Paused and unscheduled days are skipped; today doesn't count against you until it's over. "Most missed" shows a weekday that clearly stands out — skipped at least 35 % of the time over the last 90 days.</p>
     <h2>Last 12 weeks</h2>
     <div class="heat">${cells}</div>`;
 }
 
-function renderSettings() {
+// ---- Plan: 8 columns (Every day + Mon..Sun), flexible habits below ----
+const FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+function renderPlan() {
   const active = data.habits.filter(h => !h.archived);
+  const todayDow = L.dow(today());
+  const cols = [
+    { key: 'daily', title: 'Every day', list: active.filter(h => h.freq.kind === 'daily') },
+    ...WD.map((d, i) => ({ key: i, title: d, today: i === todayDow, list: active.filter(h => h.freq.kind === 'days' && h.freq.days.includes(i)) })),
+  ];
+  const flex = active.filter(h => h.freq.kind === 'weekly');
   const archived = data.habits.filter(h => h.archived);
-  const e = editing === 'new' ? { name: '', note: '', freq: { kind: 'daily' } } : data.habits.find(h => h.id === editing);
-  const fv = e && (e.freq.kind === 'weekly' ? 'w' + e.freq.times : e.freq.kind);
+  const card = h => `<button class="pcard" data-act="edit" data-id="${esc(h.id)}">
+    <span class="name">${esc(h.name)}</span>${h.note ? `<span class="note">${esc(h.note)}</span>` : ''}
+    ${h.freq.kind === 'weekly' ? `<span class="note">${freqText(h.freq)}</span>` : ''}</button>`;
+  return `
+    <h1 class="title">Weekly plan</h1>
+    <p class="muted">Add habits to the days you want to do them. "Every day" habits show up on every day.</p>
+    <div class="board">${cols.map(c => `<section class="col${c.today ? ' today' : ''}">
+      <header><b>${c.title}</b><span>${c.list.length}</span>${c.today ? '<em>Today</em>' : ''}</header>
+      ${c.list.map(card).join('') || '<p class="muted empty-col">Nothing yet</p>'}
+      <button class="add" data-act="new" data-col="${c.key}">+ Add</button>
+    </section>`).join('')}</div>
+    <h2>Flexible — any days of the week</h2>
+    <div class="flexlist">${flex.map(card).join('')}<button class="add" data-act="new" data-col="flex">+ Add flexible habit (e.g. 3× per week)</button></div>
+    ${archived.length ? `<h2>Archived (history kept)</h2>${archived.map(h => `<div class="row">
+      <span class="txt"><span class="name">${esc(h.name)}</span><span class="note">${esc(freqText(h.freq))}</span></span>
+      <button data-act="archive" data-id="${esc(h.id)}">Restore</button></div>`).join('')}` : ''}
+    ${editing ? sheet() : ''}`;
+}
+
+// add / edit dialog
+let addCol = null; // where "+ Add" was pressed: 'daily' | 'flex' | 0..6
+function sheet() {
+  const isNew = editing === 'new';
+  const preset = addCol === 'daily' ? { kind: 'daily' } : addCol === 'flex' ? { kind: 'weekly', times: 3 } : { kind: 'days', days: [addCol] };
+  const e = isNew ? { name: '', note: '', freq: preset } : data.habits.find(h => h.id === editing);
+  if (!e) return '';
+  const fv = e.freq.kind === 'weekly' ? 'w' + e.freq.times : e.freq.kind;
   const opts = [['daily', 'Every day'], ['days', 'Specific days'], ...[1, 2, 3, 4, 5, 6].map(n => ['w' + n, `${n}× per week (any days)`])]
     .map(([v, t]) => `<option value="${v}" ${v === fv ? 'selected' : ''}>${t}</option>`).join('');
-  const picked = e && e.freq.kind === 'days' ? e.freq.days : [0, 1, 2, 3, 4];
+  const picked = e.freq.kind === 'days' ? e.freq.days : [0, 1, 2, 3, 4];
   const chips = WD.map((d, i) => `<label class="chip"><input type="checkbox" name="day" value="${i}" ${picked.includes(i) ? 'checked' : ''}><span>${d.slice(0, 2)}</span></label>`).join('');
-  const row = (h, i, list) => `<div class="row">
-      <span class="txt"><span class="name">${esc(h.name)}</span><span class="note">${esc([freqText(h.freq), h.note].filter(Boolean).join(' · '))}</span></span>
-      ${h.archived ? `<button data-act="archive" data-id="${esc(h.id)}">Restore</button>` : `
-        <button data-act="up" data-id="${esc(h.id)}" aria-label="Move up" ${i === 0 ? 'disabled' : ''}>↑</button>
-        <button data-act="down" data-id="${esc(h.id)}" aria-label="Move down" ${i === list.length - 1 ? 'disabled' : ''}>↓</button>
-        <button data-act="edit" data-id="${esc(h.id)}">Edit</button>
-        <button data-act="archive" data-id="${esc(h.id)}">Archive</button>`}
-    </div>`;
-  return `
-    <h2>Habits</h2>
-    ${e ? `<form id="hform" data-kind="${fv === 'days' ? 'days' : ''}">
-      <label>Name <input name="name" required maxlength="60" value="${esc(e.name)}" autocomplete="off"></label>
-      <label>What counts as done (optional) <input name="note" maxlength="60" value="${esc(e.note)}" placeholder="e.g. 5 g, 7+ h" autocomplete="off"></label>
+  const day = typeof addCol === 'number' ? addCol : null;
+  // same habit on several days = one habit (keeps its stats together)
+  const existing = isNew && day !== null ? data.habits.filter(h => !h.archived && h.freq.kind === 'days' && !h.freq.days.includes(day)) : [];
+  const title = !isNew ? 'Edit habit' : day !== null ? `Add to ${FULL[day]}` : addCol === 'daily' ? 'Add every-day habit' : 'Add flexible habit';
+  return `<div class="backdrop" data-act="cancel"></div>
+    <form id="hform" class="sheet" data-kind="${fv === 'days' ? 'days' : ''}" role="dialog" aria-modal="true" aria-label="${title}">
+      <h3>${title}</h3>
+      ${existing.length ? `<div class="quick"><span class="muted">Add existing:</span>${existing.map(h =>
+        `<button type="button" class="qchip" data-act="addday" data-id="${esc(h.id)}">${esc(h.name)}</button>`).join('')}</div>
+        <div class="or">or create a new one</div>` : ''}
+      <label>Name <input name="name" required maxlength="60" value="${esc(e.name)}" placeholder="e.g. Gym" autocomplete="off"></label>
+      <label><span>Details <span class="rec">recommended</span></span>
+        <input name="note" maxlength="80" value="${esc(e.note)}" placeholder="What counts as done, e.g. push day, 45 min" autocomplete="off"></label>
       <label>How often <select name="freq">${opts}</select></label>
       <div class="days" role="group" aria-label="Days">${chips}</div>
-      <div class="btns"><button class="btn primary" type="submit">${editing === 'new' ? 'Add habit' : 'Save'}</button><button class="btn" type="button" data-act="cancel">Cancel</button></div>
-    </form>` : `<button class="btn" data-act="new">+ Add habit</button>`}
-    ${active.map(row).join('') || '<p class="muted">No active habits.</p>'}
-    ${archived.length ? `<h2>Archived (history kept)</h2>${archived.map(row).join('')}` : ''}
+      <div class="btns"><button class="btn primary" type="submit">${isNew ? 'Add habit' : 'Save'}</button><button class="btn" type="button" data-act="cancel">Cancel</button></div>
+      ${isNew ? '' : `<div class="btns secondary">
+        <button class="btn" type="button" data-act="up" data-id="${esc(e.id)}">Move up</button>
+        <button class="btn" type="button" data-act="down" data-id="${esc(e.id)}">Move down</button>
+        <button class="btn" type="button" data-act="archive" data-id="${esc(e.id)}">Archive</button></div>`}
+    </form>`;
+}
+
+function renderSettings() {
+  return `
     <h2>Backup</h2>
     <p class="muted">Your data lives on this device${sync ? ' and in your private gist' : ' only'}. Last backup: ${data.lastExport ? label(data.lastExport) : 'never'}.
       ${persisted === true ? 'Storage is persistent.' : persisted === false ? 'The browser may clear storage when space runs low — export regularly.' : ''}</p>
@@ -431,13 +540,61 @@ function renderSettings() {
 }
 
 function render() {
-  document.getElementById('view').innerHTML = tab === 'today' ? renderToday() : tab === 'stats' ? renderStats() : renderSettings();
+  const view = document.getElementById('view');
+  const board = document.querySelector('.board');
+  const boardScroll = board ? board.scrollLeft : null; // keep the board where it was when the dialog opens/closes
+  view.innerHTML = { today: renderToday, plan: renderPlan, stats: renderStats, settings: renderSettings }[tab]();
+  view.classList.toggle('wide', tab === 'plan');
+  document.body.classList.toggle('locked', !!editing);
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
   const name = document.querySelector('#hform input[name=name]');
-  if (name && !name.value) name.focus();
+  if (name && !name.value && !document.querySelector('.quick')) name.focus();
   const mx = document.querySelector('.mx-wrap');
   if (mx) mx.scrollLeft = mx.scrollWidth; // newest days first in view
+  const nb = document.querySelector('.board');
+  if (nb) {
+    if (boardScroll !== null) nb.scrollLeft = boardScroll;
+    else { const tc = nb.querySelector('.col.today'); if (tc && nb.scrollWidth > nb.clientWidth) nb.scrollLeft = tc.offsetLeft - nb.offsetLeft - 16; }
+  }
+  if (celebrate) confetti();
   celebrate = false;
+}
+
+// ---- celebration ----
+const MILESTONES = [3, 7, 14, 21, 30, 50, 75, 100, 150, 200, 365];
+let toastTimer;
+function toast(title, sub = '') {
+  const el = document.getElementById('toast');
+  el.innerHTML = `<b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}`;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+function confetti() {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const c = document.createElement('canvas');
+  c.id = 'confetti';
+  const dpr = devicePixelRatio || 1, W = innerWidth, H = innerHeight;
+  c.width = W * dpr; c.height = H * dpr;
+  document.body.appendChild(c);
+  const g = c.getContext('2d');
+  g.scale(dpr, dpr);
+  const colors = ['#34d399', '#60a5fa', '#fbbf24', '#f472b6', '#a78bfa', '#f97316'];
+  const ps = Array.from({ length: 150 }, () => ({
+    x: W / 2 + (Math.random() - .5) * 60, y: H * .28, vx: (Math.random() - .5) * 16, vy: -Math.random() * 13 - 5,
+    r: Math.random() * 6, vr: (Math.random() - .5) * .35, w: 6 + Math.random() * 6, h: 3 + Math.random() * 4, c: colors[Math.random() * colors.length | 0],
+  }));
+  const t0 = performance.now();
+  (function frame(t) {
+    const p = (t - t0) / 2000;
+    g.clearRect(0, 0, W, H);
+    g.globalAlpha = Math.max(0, 1 - p * p);
+    for (const q of ps) {
+      q.vy += .38; q.vx *= .985; q.x += q.vx; q.y += q.vy; q.r += q.vr;
+      g.save(); g.translate(q.x, q.y); g.rotate(q.r); g.fillStyle = q.c; g.fillRect(-q.w / 2, -q.h / 2, q.w, q.h); g.restore();
+    }
+    if (p < 1) requestAnimationFrame(frame); else c.remove();
+  })(t0);
 }
 
 function move(id, dir) {
@@ -460,7 +617,7 @@ function exportData() {
 }
 
 document.addEventListener('click', ev => {
-  const b = ev.target.closest('button');
+  const b = ev.target.closest('button, .backdrop');
   if (!b) return;
   if (b.dataset.tab) { tab = b.dataset.tab; editing = null; if (tab === 'today') viewDay = today(); return render(); }
   const id = b.dataset.id;
@@ -469,20 +626,32 @@ document.addEventListener('click', ev => {
     case 'prev': viewDay = L.addDays(viewDay, -1); break;
     case 'next': if (viewDay < today()) viewDay = L.addDays(viewDay, 1); break;
     case 'toggle': {
-      const before = L.dayScore(data, viewDay);
+      const t = today();
+      const before = L.dayScore(data, viewDay), streakBefore = L.streak(data, h, t);
       L.toggle(data, id, viewDay);
       save();
-      const after = L.dayScore(data, viewDay);
-      celebrate = after.total > 0 && after.done === after.total && before.done !== before.total;
-      if (navigator.vibrate) navigator.vibrate(celebrate ? [12, 70, 12] : 8);
+      const after = L.dayScore(data, viewDay), streakAfter = L.streak(data, h, t);
+      celebrate = !L.isPaused(data, viewDay) && after.total > 0 && after.done === after.total && before.done !== before.total;
+      if (celebrate) {
+        const ps = L.perfectStreak(data, t);
+        toast('Day complete', ps > 1 ? `${ps} perfect days in a row` : 'Every habit done. Keep it going tomorrow.');
+      } else if (streakAfter > streakBefore && MILESTONES.includes(streakAfter)) {
+        toast(`${streakAfter}-${h.freq.kind === 'weekly' ? 'week' : 'day'} streak`, h.name);
+      }
+      if (navigator.vibrate) navigator.vibrate(celebrate ? [15, 60, 15, 60, 30] : 8);
       break;
     }
+    case 'addday': if (h && typeof addCol === 'number') {
+      const days = [...h.freq.days, addCol].sort();
+      h.freq = days.length === 7 ? { kind: 'daily' } : { kind: 'days', days };
+      h.updated = Date.now(); editing = null; save();
+    } break;
     case 'review': ui.reviewed = L.addDays(today(), -1); saveUi(); viewDay = ui.reviewed; break;
     case 'dismiss': ui.reviewed = L.addDays(today(), -1); saveUi(); break;
     case 'range': range = Number(b.dataset.n); break;
     case 'open': viewDay = b.dataset.day; tab = 'today'; break;
     case 'pause': L.togglePause(data, viewDay); save(); break;
-    case 'new': editing = 'new'; break;
+    case 'new': editing = 'new'; addCol = /^\d$/.test(b.dataset.col) ? Number(b.dataset.col) : b.dataset.col; break;
     case 'edit': editing = id; break;
     case 'cancel': editing = null; break;
     case 'up': move(id, -1); save(); break;
@@ -517,6 +686,8 @@ document.addEventListener('submit', ev => {
   save();
   render();
 });
+
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && editing) { editing = null; render(); } });
 
 // show weekday chips only for "Specific days"
 document.addEventListener('change', ev => {

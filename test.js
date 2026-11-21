@@ -227,4 +227,19 @@ assert.notStrictEqual(L.newId(), L.newId());
   assert.ok(!L.validate(withFreq({ kind: 'weekly', times: 0 })));
 }
 
+// --- perfect days (everything scheduled done) ---
+{
+  const h = daily('2026-11-10');
+  const gym = { id: 'g', name: 'Gym', note: '', type: 'check', freq: { kind: 'days', days: [0] }, created: '2026-11-10', archived: false }; // Mondays
+  // 11-15..11-18 all done (Mon 11-16 needs gym too), 11-14 missed, 11-17 paused, today pending
+  const d = data([h, gym], { d: ['2026-11-15', '2026-11-16', '2026-11-18'], g: ['2026-11-16'] }, ['2026-11-17']);
+  assert.ok(L.isPerfect(d, '2026-11-16') && !L.isPerfect(d, '2026-11-14') && !L.isPerfect(d, '2026-11-17'));
+  assert.strictEqual(L.perfectStreak(d, T), 3);          // 15, 16, 18 (17 paused, today not over)
+  L.toggle(d, 'd', T);
+  assert.strictEqual(L.perfectStreak(d, T), 4);          // today done too
+  L.toggle(d, 'g', '2026-11-16');                         // un-do gym on Monday -> Monday not perfect
+  assert.strictEqual(L.perfectStreak(d, T), 2);
+  assert.strictEqual(L.perfectStreak(data([]), T), 0);   // no habits
+}
+
 console.log('all tests passed');

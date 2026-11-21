@@ -89,6 +89,24 @@
     return { done: hs.filter(h => isDone(data, h.id, key)).length, total: hs.length };
   }
 
+  // perfect day = not paused, something was due, and all of it was done
+  function isPerfect(data, key) {
+    if (isPaused(data, key)) return false;
+    const s = dayScore(data, key);
+    return s.total > 0 && s.done === s.total;
+  }
+  // Perfect days in a row. Paused days and days with nothing due are skipped; an unfinished today doesn't break it.
+  function perfectStreak(data, today) {
+    const first = data.habits.reduce((m, h) => (!m || h.created < m ? h.created : m), null);
+    let n = 0;
+    for (let k = today; first && k >= first; k = addDays(k, -1)) {
+      if (isPaused(data, k) || !dayScore(data, k).total) continue;
+      if (isPerfect(data, k)) n++;
+      else if (k !== today) break;
+    }
+    return n;
+  }
+
   // Met (true) / missed (false) units since creation, oldest first: scheduled days for daily/days habits,
   // weeks for weekly ones (required = min(times, non-paused days that week)). The current day/week is left
   // out while it can still be met, so an unfinished today never breaks a streak.
@@ -202,7 +220,7 @@
     };
   }
 
-  const api = { dayKey, addDays, weekStart, dow, isScheduled, isDone, isPaused, toggle, togglePause, merge, weekCount, isDue, dayScore,
+  const api = { dayKey, addDays, weekStart, dow, isScheduled, isDone, isPaused, toggle, togglePause, merge, weekCount, isDue, dayScore, isPerfect, perfectStreak,
     streak, bestStreak, percent, cellStatus, weakDay, validate, newId, defaultData };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.HabitLogic = api;
