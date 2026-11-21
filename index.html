@@ -1181,7 +1181,7 @@ function finishOnboarding() {
 }
 
 // ---- daily reminder: Web Push from a tiny Cloudflare Worker (olyx-reminders) ----
-const PUSH_API = ''; // set once the worker is deployed, e.g. 'https://olyx-reminders.<account>.workers.dev'
+const PUSH_API = 'https://olyx-reminders.mmartis-99d.workers.dev'; // worker code: C:\Users\mmart\olyx-reminders
 const VAPID_PUBLIC = 'BIkGEm4pxuy3W9NC7wtmgOSD6sgFsAYZ5SW4PsWu9qGJBFi0OuX6SvdUWa0E5l4rVMY5cPhn4ybw54kKGdexX6M';
 const canPush = () => !!PUSH_API && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 let remStatus = '';
