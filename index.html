@@ -906,7 +906,7 @@ function renderSettings() {
     <h2>App</h2>
     ${standalone() ? '<p class="muted">OLYX is installed on this device.</p>' : installEvt
       ? '<button class="btn primary" data-act="install">Install OLYX on this device</button>'
-      : '<p class="muted">To install: open the Chrome menu (⋮) and tap <b>Install app</b> or <b>Add to Home screen</b>. On a computer use the install icon at the right of the address bar.</p>'}
+      : `<p class="muted">${INSTALL_STEPS} On a computer use the install icon at the right of the address bar.</p>`}
     <h2>Backup</h2>
     <p class="muted">Your data lives on this device${sync ? ' and in your private gist' : ' only'}. Last backup: ${data.lastExport ? label(data.lastExport) : 'never'}.
       ${persisted === true ? 'Storage is persistent.' : persisted === false ? 'The browser may clear storage when space runs low — export regularly.' : ''}</p>
@@ -1370,6 +1370,8 @@ function pickAsk() {
   if (wantsNotify() && !ui.notifyNo) ask = 'notify';
   else if (wantsInstall() && !ui.installNo) ask = 'install';
 }
+// a home-screen *shortcut* (not a real install) shows Chrome's "Tap to copy the URL for this app" notification while open
+const INSTALL_STEPS = 'In Chrome tap <b>⋮</b> → <b>Install app</b>. If you only see <b>Add to Home screen</b>, tap it and choose <b>Install</b>, not "Create shortcut".';
 function askModal() {
   const notify = ask === 'notify';
   return `<div class="backdrop"></div>
@@ -1378,7 +1380,7 @@ function askModal() {
       <div class="am-ico">${notify ? BELL : LOGO}</div>
       <h3>${notify ? 'Never miss a day' : 'Install OLYX'}</h3>
       <p>${notify ? 'So nothing slips through the cracks.' : installEvt ? 'Open OLYX from your home screen like any other app.'
-        : 'In Chrome tap the menu <b>⋮</b> and choose <b>Install app</b> (or <b>Add to Home screen</b>).'}</p>
+        : INSTALL_STEPS}</p>
       <button class="btn primary" data-act="ask-yes">${notify ? 'Turn on notifications' : installEvt ? 'Install' : 'Got it'}</button>
     </div>`;
 }
