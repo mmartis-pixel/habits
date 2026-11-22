@@ -270,6 +270,12 @@
   .btn:disabled { opacity: .45; }
   .ob-time { display: flex; align-items: center; gap: 10px; margin: 18px 0 8px; color: var(--text); font-size: 1rem; }
   .remrow { display: flex; gap: 10px; align-items: end; }
+  .ask { display: grid; gap: 10px; margin-bottom: 12px; padding: 14px; border-radius: 16px; border: 1px solid rgb(52 211 153 / .35);
+    background: linear-gradient(135deg, rgb(52 211 153 / .1), rgb(59 130 246 / .05)); }
+  .ask-t b { display: block; } .ask-t span { font-size: .85rem; color: var(--muted); }
+  .ask-row { display: flex; gap: 8px; align-items: center; }
+  .ask-row .btn { margin: 0; flex: 1; padding: 10px; }
+  .ask-row input { padding: 9px 10px; }
   .remrow label { flex: none; }
   .remrow .seg { flex: 1; }
   .btn.link { background: none; border: 0; color: var(--muted); margin-top: 6px; padding: 8px; }
@@ -320,7 +326,8 @@
   .rv-row em { font-style: normal; font-weight: 700; }
   .hsheet .btns, .rsheet .btns { margin-top: 12px; display: flex; gap: 8px; }
   .hsheet .btns .btn, .rsheet .btns .btn { margin: 0; }
-  .sheet.hsheet, .sheet.rsheet { background: var(--card); border: 1px solid var(--line); display: block; }
+  .sheet.hsheet, .sheet.rsheet { background: var(--card); border: 1px solid var(--line); display: block;
+    top: 50%; bottom: auto; transform: translate(-50%, -50%); width: min(520px, calc(100% - 24px)); max-height: 88vh; border-radius: 20px; padding: 18px 16px; }
   .mrev { width: 100%; display: flex; align-items: center; justify-content: space-between; text-align: left; margin-bottom: 12px; padding: 14px 16px;
     border-radius: 16px; border: 1px solid rgb(52 211 153 / .35); background: linear-gradient(135deg, rgb(52 211 153 / .12), rgb(59 130 246 / .06)); }
   .mrev b { display: block; }
@@ -328,6 +335,63 @@
   .mrev i { font-style: normal; font-size: 1.5rem; color: var(--accent); }
   .hlink { border: 0; background: none; padding: 0; text-align: left; font-weight: 500; text-decoration: underline; text-decoration-color: #3a404c; text-underline-offset: 3px; }
 
+
+  /* toast + confetti */
+  #toast { position: fixed; left: 50%; top: 30%; transform: translate(-50%, 12px) scale(.96); opacity: 0; pointer-events: none; z-index: 30; min-width: 220px;
+    background: var(--card); border: 1px solid var(--accent); border-radius: 16px; padding: 16px 22px; text-align: center; transition: .25s; box-shadow: 0 16px 40px rgb(0 0 0 / .55); }
+  #toast.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  #toast b { display: block; font-size: 1.05rem; }
+  #toast span { color: var(--muted); font-size: .85rem; }
+  #confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 45; }
+
+  /* plan board */
+  main.wide { max-width: 1240px; }
+  h1.title { font-size: 1.35rem; margin: 4px 0 2px; }
+  .board { display: grid; grid-auto-flow: column; grid-auto-columns: 78%; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory;
+    margin: 14px -16px 0; padding: 0 16px 10px; scroll-padding: 0 16px; scrollbar-width: thin; }
+  .col { scroll-snap-align: start; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 8px; min-height: 200px; }
+  .col.today { border-color: rgb(52 211 153 / .6); }
+  .col header { display: flex; align-items: baseline; gap: 8px; padding: 0 2px 2px; }
+  .col header span { color: var(--muted); font-size: .8rem; }
+  .col header em { margin-left: auto; font-style: normal; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--accent); }
+  .pcard { text-align: left; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+  .pcard:hover { border-color: #3a404c; }
+  .pcard .name { font-weight: 600; overflow-wrap: anywhere; }
+  /* fewer pixels per card as columns fill up: details go to one line, then hide (still in the tooltip) */
+  .board.compact .col { gap: 5px; padding: 10px; min-height: 0; }
+  .board.compact .pcard { padding: 7px 10px; border-radius: 10px; }
+  .board.compact .pcard .name { font-size: .92rem; }
+  .board.compact .pcard .note { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .78rem; }
+  .board.compact .add { padding: 7px; }
+  .board.dense .col { gap: 4px; padding: 8px; min-height: 0; }
+  .board.dense .pcard { padding: 5px 9px; border-radius: 8px; }
+  .board.dense .pcard .name { font-size: .85rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .board.dense .pcard .note { display: none; }
+  .board.dense .add { padding: 5px; font-size: .85rem; }
+  .board.dense header, .board.compact header { padding-bottom: 0; }
+  .add { border: 1px dashed var(--line); background: none; color: var(--muted); border-radius: 12px; padding: 10px; }
+  .col .add { margin-top: auto; }
+  .add:hover { color: var(--text); border-color: var(--muted); }
+  .empty-col { margin: 4px 2px; }
+  .flexlist { display: grid; gap: 8px; }
+  @media (min-width: 900px) {
+    .board { grid-auto-flow: row; grid-template-columns: repeat(8, minmax(0, 1fr)); overflow: visible; margin: 14px 0 0; padding: 0; }
+    .flexlist { grid-template-columns: repeat(4, 1fr); }
+  }
+
+  /* dialog */
+  body.locked { overflow: hidden; }
+  .backdrop { position: fixed; inset: 0; background: rgb(0 0 0 / .6); z-index: 20; animation: fade .15s; }
+  .sheet { position: fixed; left: 50%; bottom: 0; transform: translateX(-50%); width: min(560px, 100%); max-height: 92vh; overflow-y: auto; z-index: 21;
+    border-radius: 20px 20px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom)); animation: fade .18s; box-shadow: 0 -10px 40px rgb(0 0 0 / .5); }
+  @media (min-width: 700px) { .sheet { bottom: auto; top: 50%; transform: translate(-50%, -50%); border-radius: 20px; } }
+  @keyframes fade { from { opacity: 0; } }
+  .sheet h3 { margin: 0 0 2px; font-size: 1.15rem; }
+  .rec { color: var(--accent); font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-left: 6px; }
+  .quick { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .qchip { border: 1px solid var(--accent); color: var(--accent); background: none; border-radius: 999px; padding: 7px 13px; font-weight: 600; }
+  .or { text-align: center; color: var(--muted); font-size: .8rem; margin: 2px 0; }
+  .btns.secondary .btn { margin: 0; font-size: .85rem; padding: 10px 6px; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -555,7 +619,15 @@ function renderToday() {
     ? data.habits.filter(h => !h.archived && L.cellStatus(data, h, y, t) === 'missed').length : 0;
   const empty = !active.length ? 'No habits yet. Add some in Plan.' : !planned.length ? 'Nothing scheduled for this day.' : '';
   const ps = viewDay === t ? L.perfectStreak(data, t) : 0;
+  // asked up front like any app: install (when the browser offers it) and the daily reminder
+  const askInstall = viewDay === t && installEvt && !standalone() && !ui.installNo;
+  const askRem = viewDay === t && !askInstall && canPush() && !(ui.reminder && ui.reminder.on) && !ui.remAsked
+    && Notification.permission !== 'denied' && data.habits.length;
   return `
+    ${askInstall ? `<div class="ask"><div class="ask-t"><b>Install OLYX</b><span>Get it on your home screen and open it like any other app.</span></div>
+      <div class="ask-row"><button class="btn primary" data-act="install">Install</button><button class="x" data-act="install-no" aria-label="Not now">×</button></div></div>` : ''}
+    ${askRem ? `<div class="ask"><div class="ask-t"><b>Daily reminder</b><span>One notification at your time with what's left to do.</span></div>
+      <div class="ask-row"><input type="time" id="asktime" value="21:00" aria-label="Reminder time"><button class="btn primary" data-act="ask-on">Turn on</button><button class="x" data-act="ask-no" aria-label="Not now">×</button></div></div>` : ''}
     ${open ? `<div class="banner info"><span>Yesterday: ${open} not logged</span>
       <button data-act="review">Review</button><button class="x" data-act="dismiss" aria-label="Dismiss">×</button></div>` : ''}
     ${needBackup ? `<button class="banner" data-act="export">Back up your data — tap to export</button>` : ''}
@@ -611,7 +683,7 @@ function renderStats() {
 
   // 12 weeks as dots (columns = weeks, rows = Mon..Sun), coloured by share done; hover / tap = day summary
   const start = L.addDays(L.weekStart(t), -7 * 11);
-  let cells = '<span></span>' + ['M', '', 'W', '', 'F', '', 'S'].map(d => `<span class="dl">${d}</span>`).join('');
+  let cells = '<span></span>' + ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(d => `<span class="dl">${d}</span>`).join('');
   let perfect12 = 0, shown = '';
   for (let w = 0; w < 12; w++) {
     const ws = L.addDays(start, w * 7), mon = MONTHS[Number(L.addDays(ws, 6).slice(5, 7)) - 1];
@@ -639,11 +711,11 @@ function renderStats() {
     <div class="legend"><span><i class="c done"></i>Done</span><span><i class="c missed"></i>Missed</span><span><i class="c off"></i>Not scheduled</span>
       <span><i class="c bonus"></i>Bonus</span><span><i class="c paused"></i>Paused</span></div>
     <p class="muted">Tap a date to open that day and fix it.</p>` : '<p class="muted">No habits yet.</p>'}
+    <h2>Last 12 weeks${perfect12 ? ` <span class="muted">· ${perfect12} perfect day${perfect12 === 1 ? '' : 's'}</span>` : ''}</h2>
+    <div class="dots">${cells}</div>
     <h2>Habits</h2>
     <table><tr><th>Habit</th><th>Streak</th><th>Best</th><th>${range} d</th><th>Most missed</th></tr>${rows}</table>
-    <p class="muted">Tap a habit for its full history. Streak counts scheduled days in a row (weeks for flexible habits). Paused and unscheduled days are skipped; today doesn't count against you until it's over. "Most missed" shows a weekday that clearly stands out — skipped at least 35 % of the time over the last 90 days.</p>
-    <h2>Last 12 weeks${perfect12 ? ` <span class="muted">· ${perfect12} perfect day${perfect12 === 1 ? '' : 's'}</span>` : ''}</h2>
-    <div class="dots">${cells}</div>`;
+    <p class="muted">Tap a habit for its full history. Streak counts scheduled days in a row (weeks for flexible habits). Paused and unscheduled days are skipped; today doesn't count against you until it's over. "Most missed" shows a weekday that clearly stands out — skipped at least 35 % of the time over the last 90 days.</p>`;
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -773,7 +845,12 @@ function renderSettings() {
     ${!canPush() ? `<p class="muted">${PUSH_API ? 'This browser can\'t show reminders. On Android use Chrome and install OLYX to the home screen.' : 'Reminders are almost ready — they switch on with the next update.'}</p>` : `
       <div class="remrow"><label>Time <input type="time" id="remtime" value="${(ui.reminder && ui.reminder.time) || '21:00'}"></label>
         ${seg('setrem', ui.reminder && ui.reminder.on ? 'on' : 'off', [['on', 'On'], ['off', 'Off']])}</div>
-      <p class="muted">${esc(remStatus || (ui.reminder && ui.reminder.on ? `Every day at ${ui.reminder.time}. It tells you what's left — or that the day is done.` : 'One notification a day with what is left to do.'))}</p>`}
+      <p class="muted">${esc(remStatus || (ui.reminder && ui.reminder.on ? `Every day at ${ui.reminder.time}, on the minute. It tells you what's left — or that the day is done.` : 'One notification a day with what is left to do.'))}</p>
+      ${ui.reminder && ui.reminder.on ? '<button class="btn" data-act="remtest">Send a test notification now</button>' : ''}`}
+    <h2>App</h2>
+    ${standalone() ? '<p class="muted">OLYX is installed on this device.</p>' : installEvt
+      ? '<button class="btn primary" data-act="install">Install OLYX on this device</button>'
+      : '<p class="muted">To install: open the Chrome menu (⋮) and tap <b>Install app</b> or <b>Add to Home screen</b>. On a computer use the install icon at the right of the address bar.</p>'}
     <h2>Backup</h2>
     <p class="muted">Your data lives on this device${sync ? ' and in your private gist' : ' only'}. Last backup: ${data.lastExport ? label(data.lastExport) : 'never'}.
       ${persisted === true ? 'Storage is persistent.' : persisted === false ? 'The browser may clear storage when space runs low — export regularly.' : ''}</p>
@@ -1186,11 +1263,15 @@ const VAPID_PUBLIC = 'BIkGEm4pxuy3W9NC7wtmgOSD6sgFsAYZ5SW4PsWu9qGJBFi0OuX6SvdUWa
 const canPush = () => !!PUSH_API && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 let remStatus = '';
 const b64u = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - s.length % 4) % 4)), c => c.charCodeAt(0));
-async function enableReminder(time) {
+// quiet = refresh on app start (keeps time zone / server record current), no UI changes
+async function enableReminder(time, quiet = false) {
   try {
-    if (Notification.permission !== 'granted' && await Notification.requestPermission() !== 'granted') {
-      remStatus = 'Notifications are blocked — allow them for this site in the browser settings.';
-      return render();
+    if (Notification.permission !== 'granted') {
+      if (quiet || await Notification.requestPermission() !== 'granted') {
+        if (!quiet) { remStatus = 'Notifications are blocked — allow them for OLYX in your phone / browser settings.'; render(); }
+        else { ui.reminder = { on: false, time }; saveUi(); }
+        return;
+      }
     }
     const reg = await navigator.serviceWorker.ready;
     const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(VAPID_PUBLIC) });
@@ -1198,8 +1279,34 @@ async function enableReminder(time) {
       body: JSON.stringify({ subscription: sub.toJSON(), time, tz: Intl.DateTimeFormat().resolvedOptions().timeZone }) });
     if (!r.ok) throw new Error('server said ' + r.status);
     ui.reminder = { on: true, time }; saveUi(); snapshot();
+    if (quiet) return;
     remStatus = `Every day at ${time}.`;
-  } catch (e) { remStatus = 'Could not turn on the reminder: ' + e.message; }
+    toast('Reminder on', `Every day at ${time}`);
+  } catch (e) { if (quiet) return; remStatus = 'Could not turn on the reminder: ' + e.message; }
+  render();
+}
+async function testReminder() {
+  remStatus = 'Sending…'; render();
+  try {
+    const sub = await (await navigator.serviceWorker.ready).pushManager.getSubscription();
+    if (!sub) throw new Error('the reminder is not on on this device');
+    const r = await (await fetch(PUSH_API + '/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: sub.endpoint }) })).json();
+    remStatus = r.ok ? 'Test sent — it should pop up within a few seconds. If it doesn\'t, allow notifications for OLYX / Chrome in Android settings and turn off battery saving for it.'
+      : `Test failed (${r.status || r.error}). Turn the reminder Off and On again.`;
+  } catch (e) { remStatus = 'Test failed: ' + e.message; }
+  render();
+}
+
+// install as an app (Android Chrome / desktop Chrome & Edge)
+let installEvt = null;
+const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; safeRender(); });
+addEventListener('appinstalled', () => { installEvt = null; toast('OLYX installed', 'Open it from your home screen'); safeRender(); });
+async function installApp() {
+  if (!installEvt) return;
+  installEvt.prompt();
+  await installEvt.userChoice;
+  installEvt = null;
   render();
 }
 async function disableReminder() {
@@ -1280,6 +1387,11 @@ document.addEventListener('click', ev => {
     case 'ob-done': finishOnboarding(); break;
     case 'ob-sync': onboard = null; ui.onboarded = true; saveUi(); tab = 'settings'; break;
     case 'ob-remind': { const time = document.getElementById('obtime').value || '21:00'; finishOnboarding(); enableReminder(time); break; }
+    case 'remtest': testReminder(); return;
+    case 'install': installApp(); return;
+    case 'install-no': ui.installNo = true; saveUi(); break;
+    case 'ask-on': ui.remAsked = true; saveUi(); enableReminder(document.getElementById('asktime').value || '21:00'); return;
+    case 'ask-no': ui.remAsked = true; saveUi(); break;
     case 'setrem': if (b.dataset.v === 'on') enableReminder(document.getElementById('remtime').value || '21:00'); else disableReminder(); return;
     // sound & effects
     case 'setsound': ui.sound = b.dataset.v === 'on'; saveUi(); Sfx.play('pop'); break;
@@ -1387,6 +1499,8 @@ window.addEventListener('online', () => syncNow());
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().then(ok => { persisted = ok; if (tab === 'settings') render(); });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 
+// keep the reminder registration fresh (time zone, server record) every time the app opens
+if (canPush() && ui.reminder && ui.reminder.on) enableReminder(ui.reminder.time, true);
 // onboarding until it was finished once (also if the app was closed halfway through)
 if (!ui.onboarded && !data.habits.length && !Object.keys(data.log).length) onboard = { step: 0, picked: [] };
 // first days of a new month: show last month's review once

@@ -1,7 +1,7 @@
 // Offline cache. Stale-while-revalidate: opens instantly from cache, fetches updates in the background
 // (new version shows on the next open). Bump CACHE when the file list changes.
 importScripts('logic.js'); // HabitLogic — used to build the reminder text
-const CACHE = 'olyx-v3';
+const CACHE = 'olyx-v4';
 const STATE = 'olyx-state'; // data snapshot written by the page (the worker can't read localStorage)
 const FILES = ['./', 'index.html', 'logic.js', 'manifest.json', 'icon-192.png', 'icon-512.png', 'icon-badge.png'];
 
@@ -50,7 +50,8 @@ async function reminderText() {
 }
 
 self.addEventListener('push', e => {
-  e.waitUntil(reminderText().then(({ title, body }) => self.registration.showNotification(title, {
+  // never fail silently: if building the text breaks, still show a plain reminder
+  e.waitUntil(reminderText().catch(() => ({ title: 'OLYX', body: 'Time for a quick check-in.' })).then(({ title, body }) => self.registration.showNotification(title, {
     body, icon: 'icon-192.png', badge: 'icon-badge.png', tag: 'olyx-daily', renotify: true,
   })));
 });
