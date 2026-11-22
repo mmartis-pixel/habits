@@ -301,6 +301,8 @@
   .remrow label { flex: none; }
   .remrow .seg { flex: 1; }
   .btn.link { background: none; border: 0; color: var(--muted); margin-top: 6px; padding: 8px; }
+  .gbtn { min-height: 44px; margin: 8px 0; display: flex; justify-content: center; }
+  .ob-or { margin: 22px 0 0; font-size: .85rem; color: var(--muted); }
   #toast .ti { display: block; margin: 0 auto 6px; width: 34px; height: 34px; color: var(--accent); }
   #toast .ti svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   #toast .ti svg text { fill: currentColor; stroke: none; font: 800 8px system-ui; }
@@ -519,29 +521,24 @@ function save() { persist(); scheduleSync(); }
 // re-render, but never wipe a half-filled habit form
 const safeRender = () => { if (!editing) render(); };
 
-// ---- Sync between devices via a private GitHub gist ----
-const SYNC_KEY = 'habits-sync'; // { token, gistId } — kept apart from data so it never lands in an export
-const FILE = 'habits-data.json';
+// ---- Account sync: "Continue with Google" → our server (worker olyx-reminders, D1). Data stays local-first;
+// the account copy is merged on each device (L.merge), pushes carry the rev they pulled (409 = pull + merge again).
+const SYNC_KEY = 'olyx-account'; // { session, email, uid } — kept apart from data so it never lands in an export
+const GOOGLE_CLIENT_ID = '';
+localStorage.removeItem('habits-sync'); // old GitHub gist sync — replaced by the account (local data merges on sign-in)
 let sync = JSON.parse(localStorage.getItem(SYNC_KEY) || 'null');
 let syncStatus = '';
 let syncTimer = null, syncing = null, again = false;
 
-async function gh(path, opts = {}) {
-  const r = await fetch('https://api.github.com' + path, {
-    ...opts, cache: 'no-store',
-    headers: { Authorization: 'Bearer ' + sync.token, Accept: 'application/vnd.github+json', ...(opts.body ? { 'Content-Type': 'application/json' } : {}) },
-  });
-  if (!r.ok) throw new Error(r.status === 401 ? 'token invalid or expired' : r.status === 403 || r.status === 404 ? 'no access — token needs Gists: Read and write' : 'GitHub error ' + r.status);
-  return r.json();
+async function api(path, body) {
+  const r = await fetch(PUSH_API + path, { method: 'POST', cache: 'no-store',
+    headers: { 'Content-Type': 'application/json', ...(sync ? { Authorization: 'Bearer ' + sync.session } : {}) }, body: JSON.stringify(body || {}) });
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 401 && sync && path !== '/auth/google') { signedOut(); throw new Error('signed out — sign in again'); }
+  if (!r.ok) throw Object.assign(new Error(j.error || 'server error ' + r.status), { status: r.status });
+  return j;
 }
-async function pullRemote() {
-  const f = (await gh('/gists/' + sync.gistId)).files[FILE];
-  if (!f) throw new Error('data file missing in gist');
-  const obj = JSON.parse(f.truncated ? await (await fetch(f.raw_url, { cache: 'no-store' })).text() : f.content);
-  if (!L.validate(obj)) throw new Error('cloud data is not valid');
-  return obj;
-}
-const pushRemote = d => gh('/gists/' + sync.gistId, { method: 'PATCH', body: JSON.stringify({ files: { [FILE]: { content: JSON.stringify(d) } } }) });
+function signedOut() { localStorage.removeItem(SYNC_KEY); sync = null; snapshot(); }
 const clock = () => new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
 function scheduleSync() {
@@ -549,24 +546,24 @@ function scheduleSync() {
   clearTimeout(syncTimer);
   syncTimer = setTimeout(syncNow, 1500);
 }
-// pull -> merge -> push if cloud is behind. Failures keep local data; next sync retries.
-// ponytail: no locking — if both devices push within the same second, one write can be lost from the gist,
-// but that device still has it locally and re-pushes it on its next sync. Add ETag checks if that ever bites.
+// pull -> merge -> push if the account copy is behind. Failures keep local data; next sync retries.
 function syncNow() {
   clearTimeout(syncTimer); syncTimer = null;
   if (!sync) return Promise.resolve();
   if (syncing) { again = true; return syncing; }
   syncing = (async () => {
     try {
-      const remote = await pullRemote();
-      const merged = L.merge(data, remote);
-      const s = JSON.stringify(merged);
-      const localChanged = s !== JSON.stringify(data);
-      data = merged;
-      persist();
-      if (s !== JSON.stringify(remote)) await pushRemote(merged);
+      for (let i = 0; i < 3; i++) { // another device pushed in between (409) → merge its version too
+        const remote = await api('/sync/pull');
+        const merged = remote.data && L.validate(remote.data) ? L.merge(data, remote.data) : data;
+        const m = JSON.stringify(merged), localChanged = m !== JSON.stringify(data);
+        data = merged;
+        persist();
+        if (localChanged) safeRender();
+        if (remote.data && m === JSON.stringify(remote.data)) break;
+        try { await api('/sync/push', { data: merged, rev: remote.rev }); break; } catch (e) { if (e.status !== 409) throw e; }
+      }
       syncStatus = 'Synced at ' + clock();
-      if (localChanged) safeRender();
     } catch (e) {
       syncStatus = (navigator.onLine ? 'Sync failed: ' + e.message : 'Offline') + ' — will retry';
     } finally {
@@ -578,31 +575,36 @@ function syncNow() {
   return syncing;
 }
 
-async function connect(token) {
-  if (!token) return render();
-  sync = { token, gistId: null };
-  try {
-    const found = (await gh('/gists?per_page=100')).find(g => g.files && g.files[FILE]);
-    if (found) {
-      sync.gistId = found.id;
-      const remote = await pullRemote();
-      const localEmpty = !Object.keys(data.log).length && !data.pauses.length;
-      if (localEmpty) data = remote; // fresh device: just take the cloud copy
-      else if (confirm('The cloud already has habit data. Merge it with the data on this device?')) data = L.merge(data, remote);
-      else { sync = null; return render(); }
-      persist();
-      await pushRemote(data);
-    } else {
-      const g = await gh('/gists', { method: 'POST', body: JSON.stringify({ description: 'OLYX data — synced by the app, do not edit', public: false, files: { [FILE]: { content: JSON.stringify(data) } } }) });
-      sync.gistId = g.id;
-    }
-    localStorage.setItem(SYNC_KEY, JSON.stringify(sync));
-    snapshot();
-    syncStatus = 'Synced at ' + clock();
-  } catch (e) {
-    sync = null;
-    alert('Could not connect: ' + e.message);
+// Google's button (Google Identity Services, loaded only when a sign-in button is on screen)
+let gsiInit = false;
+const loadGsi = () => window.google && google.accounts ? Promise.resolve() : new Promise((ok, no) => {
+  const sc = document.createElement('script');
+  sc.src = 'https://accounts.google.com/gsi/client'; sc.onload = ok; sc.onerror = () => no(new Error('Could not load Google sign-in. Check your connection.'));
+  document.head.appendChild(sc);
+});
+async function mountGoogle() {
+  const el = document.getElementById('gbtn');
+  if (!el) return;
+  try { await loadGsi(); } catch (e) { el.textContent = e.message; return; }
+  if (!gsiInit) {
+    google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: r => signIn(r.credential), use_fedcm_for_button: true, use_fedcm_for_prompt: true });
+    gsiInit = true;
   }
+  if (document.getElementById('gbtn') === el) google.accounts.id.renderButton(el, { theme: 'filled_black', size: 'large', shape: 'pill', text: 'continue_with', width: 280 });
+}
+async function signIn(credential) {
+  syncStatus = 'Signing in…'; render();
+  const wasEmpty = !data.habits.length && !Object.keys(data.log).length;
+  try {
+    const r = await api('/auth/google', { credential });
+    sync = { session: r.session, email: r.email, uid: r.uid };
+    localStorage.setItem(SYNC_KEY, JSON.stringify(sync));
+    await syncNow(); // this device's habits + the account's habits, merged
+    if (onboard) finishOnboarding();
+    if (wasEmpty && data.habits.length) tab = 'today'; // new device: straight to the synced habits
+    if (canPush() && ui.reminder && ui.reminder.on) enableReminder(true); // reminders now grouped by account
+    toast('Signed in', r.email);
+  } catch (e) { syncStatus = 'Sign-in failed: ' + e.message; }
   render();
 }
 
@@ -908,20 +910,19 @@ function renderSettings() {
       ? '<button class="btn primary" data-act="install">Install OLYX on this device</button>'
       : `<p class="muted">${INSTALL_STEPS} On a computer use the install icon at the right of the address bar.</p>`}
     <h2>Backup</h2>
-    <p class="muted">Your data lives on this device${sync ? ' and in your private gist' : ' only'}. Last backup: ${data.lastExport ? label(data.lastExport) : 'never'}.
+    <p class="muted">Your data lives on this device${sync ? ' and in your account' : ' only'}. Last backup: ${data.lastExport ? label(data.lastExport) : 'never'}.
       ${persisted === true ? 'Storage is persistent.' : persisted === false ? 'The browser may clear storage when space runs low — export regularly.' : ''}</p>
     <button class="btn" data-act="export">Export backup (.json)</button>
     <button class="btn" data-act="import">Import backup</button>
-    <h2>Sync between devices</h2>
+    <h2>Account</h2>
     ${sync ? `
-      <p class="muted">Synced through a private GitHub gist. ${esc(syncStatus)}</p>
+      <p class="muted">Signed in as <b>${esc(sync.email)}</b> — your habits sync to every device where you sign in. ${esc(syncStatus)}</p>
       <button class="btn" data-act="syncnow">Sync now</button>
-      <button class="btn" data-act="disconnect">Disconnect this device</button>` : `
-      <p class="muted">Keeps phone and computer in sync through a private gist on your GitHub.
-        Create a token at <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener" style="color:var(--accent)">github.com → Fine-grained token</a>:
-        Account permissions → <b>Gists: Read and write</b>, nothing else. Paste it on every device.</p>
-      <input id="token" type="password" placeholder="github_pat_…" autocomplete="off" style="width:100%">
-      <button class="btn primary" data-act="connect">Connect</button>`}`;
+      <button class="btn" data-act="signout">Sign out on this device</button>
+      <button class="btn link" data-act="delacct">Delete my account data</button>` : `
+      <p class="muted">Sign in to back up your habits and use them on your phone and computer.</p>
+      <div id="gbtn" class="gbtn"></div>
+      ${syncStatus ? `<p class="muted">${esc(syncStatus)}</p>` : ''}`}`;
 }
 
 function render() {
@@ -929,7 +930,7 @@ function render() {
   const board = document.querySelector('.board');
   const boardScroll = board ? board.scrollLeft : null; // keep the board where it was when the dialog opens/closes
   document.body.classList.toggle('onboarding', !!onboard);
-  if (onboard) { view.innerHTML = renderOnboard(); applyMotion(); return; }
+  if (onboard) { view.innerHTML = renderOnboard(); applyMotion(); mountGoogle(); return; }
   view.innerHTML = { today: renderToday, plan: renderPlan, stats: renderStats, settings: renderSettings }[tab]()
     + (detail ? detailSheet() : review ? reviewSheet() : ask ? askModal() : '');
   view.classList.toggle('wide', tab === 'plan');
@@ -947,6 +948,7 @@ function render() {
   }
   celebrate = false;
   lit = null;
+  if (document.getElementById('gbtn')) mountGoogle();
 }
 
 // ---- celebrations ----
@@ -1282,7 +1284,8 @@ function renderOnboard() {
   if (onboard.step === 0) return `<div class="ob ob0">
     ${LOGO}<h1>OLYX</h1><p>Build habits that stick.<br>One day at a time.</p>
     <button class="btn primary" data-act="ob-next">Get started</button>
-    <button class="btn link" data-act="ob-sync">I already use OLYX on another device</button></div>`;
+    <p class="ob-or">Already use OLYX on another device?</p><div id="gbtn" class="gbtn"></div>
+    ${syncStatus ? `<p class="muted">${esc(syncStatus)}</p>` : ''}</div>`;
 }
 function finishOnboarding() {
   const t = today();
@@ -1299,12 +1302,12 @@ const canPush = () => !!PUSH_API && 'serviceWorker' in navigator && 'PushManager
 let remStatus = '';
 const b64u = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - s.length % 4) % 4)), c => c.charCodeAt(0));
 // Reminders are automatic: 9:00, 18:00 and 21:00 local time, only while something is left that day.
-// uid groups this user's devices (derived from the sync gist when syncing), so finishing the day on one device
+// uid groups this user's devices (from the account when signed in), so finishing the day on one device
 // silences the rest of today's reminders everywhere. The server only ever learns "day X is done".
 const REMIND_TIMES = '9:00, 18:00 and 21:00';
 async function userId() {
   const hex = b => [...b].map(x => x.toString(16).padStart(2, '0')).join('');
-  if (sync && sync.gistId) return hex(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('olyx:' + sync.gistId))).slice(0, 12));
+  if (sync && sync.uid) return sync.uid; // same id on all devices of the account (from the server)
   if (!ui.uid) { ui.uid = hex(crypto.getRandomValues(new Uint8Array(12))); saveUi(); }
   return ui.uid;
 }
@@ -1469,7 +1472,6 @@ document.addEventListener('click', ev => {
     case 'suggest': { const [name, note, f] = SUGGEST[Number(b.dataset.i)];
       data.habits.push({ id: L.newId(), name, note, type: 'check', freq: f || { kind: 'daily' }, created: today(), archived: false, updated: Date.now() });
       save(); Sfx.play('pop'); toast('Added', name); break; }
-    case 'ob-sync': onboard = null; ui.onboarded = true; saveUi(); tab = 'settings'; break;
     case 'install': installApp(); return;
     case 'ask-x': if (ask === 'notify') ui.notifyNo = true; else ui.installNo = true; saveUi(); ask = null; pickAsk(); break;
     case 'ask-yes': { const was = ask; ask = null; if (was === 'notify') { ui.notifyNo = true; saveUi(); enableReminder().then(() => { pickAsk(); render(); }); } else { ui.installNo = true; saveUi(); installApp(); } break; }
@@ -1511,11 +1513,13 @@ document.addEventListener('click', ev => {
     case 'archive': if (h) { h.archived = !h.archived; h.updated = Date.now(); if (editing === id) editing = null; save(); Sfx.play('soft'); } break;
     case 'export': exportData(); break;
     case 'import': document.getElementById('importFile').click(); return;
-    case 'connect': b.disabled = true; b.textContent = 'Connecting…'; connect(document.getElementById('token').value.trim()); return;
     case 'syncnow': syncStatus = 'Syncing…'; syncNow(); break;
-    case 'disconnect':
-      if (!confirm('Stop syncing this device? Data stays here and in the gist.')) return;
-      localStorage.removeItem(SYNC_KEY); sync = null; syncStatus = ''; snapshot(); break;
+    case 'signout':
+      if (!confirm('Sign out on this device? Your habits stay here.')) return;
+      api('/account/signout').catch(() => {}).finally(() => { signedOut(); syncStatus = ''; render(); }); return;
+    case 'delacct':
+      if (!confirm('Delete your habits from the OLYX server and sign out everywhere? This device keeps its copy. This cannot be undone.')) return;
+      api('/account/delete').then(() => { signedOut(); syncStatus = ''; toast('Account data deleted', 'This device keeps its copy'); render(); }, e => alert('Could not delete: ' + e.message)); return;
     default: return;
   }
   render();

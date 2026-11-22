@@ -32,13 +32,13 @@ async function reminderText() {
   let st = null;
   try { st = await (await (await caches.open(STATE)).match('state')).json(); } catch (e) {}
   let data = st && st.data;
-  // if sync is on, use the freshest data (the other device may have ticked things)
-  if (st && st.sync && st.sync.gistId) {
+  // signed in: use the freshest data (another device may have ticked things)
+  if (st && st.sync && st.sync.session) {
     try {
-      const r = await fetch(`https://api.github.com/gists/${st.sync.gistId}`, { cache: 'no-store',
-        headers: { Authorization: 'Bearer ' + st.sync.token, Accept: 'application/vnd.github+json' } });
-      const remote = JSON.parse((await r.json()).files['habits-data.json'].content);
-      if (L.validate(remote)) data = data ? L.merge(data, remote) : remote;
+      const r = await fetch('https://olyx-reminders.mmartis-99d.workers.dev/sync/pull', { method: 'POST', cache: 'no-store',
+        headers: { Authorization: 'Bearer ' + st.sync.session, 'Content-Type': 'application/json' }, body: '{}' });
+      const remote = (await r.json()).data;
+      if (remote && L.validate(remote)) data = data ? L.merge(data, remote) : remote;
     } catch (e) {}
   }
   if (!data || !data.habits.length) return { title: 'OLYX', body: 'Time for a quick check-in.' };
