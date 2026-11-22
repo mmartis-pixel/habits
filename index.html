@@ -270,12 +270,40 @@
   .btn:disabled { opacity: .45; }
   .ob-time { display: flex; align-items: center; gap: 10px; margin: 18px 0 8px; color: var(--text); font-size: 1rem; }
   .remrow { display: flex; gap: 10px; align-items: end; }
-  .ask { display: grid; gap: 10px; margin-bottom: 12px; padding: 14px; border-radius: 16px; border: 1px solid rgb(52 211 153 / .35);
-    background: linear-gradient(135deg, rgb(52 211 153 / .1), rgb(59 130 246 / .05)); }
-  .ask-t b { display: block; } .ask-t span { font-size: .85rem; color: var(--muted); }
-  .ask-row { display: flex; gap: 8px; align-items: center; }
-  .ask-row .btn { margin: 0; flex: 1; padding: 10px; }
-  .ask-row input { padding: 9px 10px; }
+  /* Plan on phones: habit × weekday circles; the column board stays for wide screens */
+  .pm, .only-narrow { display: none; }
+  @media (max-width: 899px) {
+    .board, .only-wide { display: none !important; }
+    .pm { display: block; } .only-narrow { display: block; }
+  }
+  .pm-head, .pm-row, .pm-count { display: grid; grid-template-columns: minmax(0, 1fr) repeat(7, 27px); gap: 2px; align-items: center; }
+  .pm-head { position: sticky; top: 0; z-index: 1; background: var(--bg); padding: 8px 0 6px; border-bottom: 1px solid var(--line); }
+  .pm-head b { text-align: center; font-size: .72rem; color: var(--muted); font-weight: 600; }
+  .pm-head b.now { color: var(--accent); }
+  .pm-row { padding: 7px 0; border-bottom: 1px solid var(--line); }
+  .pm-name { display: flex; flex-direction: column; min-width: 0; text-align: left; background: none; border: 0; padding: 2px 6px 2px 0; }
+  .pm-name .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pm-name .note { font-size: .72rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pm-d { width: 23px; height: 23px; justify-self: center; padding: 0; border-radius: 50%; border: 1.5px solid #3a404c; background: none; transition: transform .12s, background .15s; }
+  .pm-d.on { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 6px rgb(52 211 153 / .35); }
+  .pm-d.now:not(.on) { border-color: rgb(52 211 153 / .55); }
+  .pm-d:active { transform: scale(.82); }
+  .pm-count { padding: 9px 0 0; font-size: .72rem; color: var(--muted); }
+  .pm-count b { text-align: center; color: var(--text); font-weight: 600; }
+  .pm .add { width: 100%; margin-top: 14px; }
+  /* start-up windows + pills */
+  .pills { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px 6px 9px; border-radius: 999px; font-size: .8rem; font-weight: 600;
+    border: 1px solid rgb(52 211 153 / .4); background: rgb(52 211 153 / .08); color: var(--accent); }
+  .pill svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .sheet.amodal { display: block; text-align: center; background: var(--card); border: 1px solid var(--line); top: 50%; bottom: auto;
+    transform: translate(-50%, -50%); width: min(400px, calc(100% - 32px)); border-radius: 22px; padding: 28px 22px 22px; }
+  .amodal .x { position: absolute; top: 10px; right: 10px; }
+  .am-ico { width: 64px; height: 64px; margin: 4px auto 12px; display: grid; place-items: center; border-radius: 50%; background: rgb(52 211 153 / .12); color: var(--accent); }
+  .am-ico svg { width: 32px; height: 32px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .am-ico .logo { width: 44px; height: 44px; filter: none; }
+  .amodal h3 { margin: 0 0 6px; font-size: 1.25rem; }
+  .amodal p { color: var(--muted); margin: 0 0 16px; line-height: 1.45; }
   .remrow label { flex: none; }
   .remrow .seg { flex: 1; }
   .btn.link { background: none; border: 0; color: var(--muted); margin-top: 6px; padding: 8px; }
@@ -476,6 +504,7 @@ function persist() {
 }
 // copy of the data (+ sync info) for the service worker, which can't read localStorage — used by reminders
 function snapshot() {
+  if (typeof reportDone === 'function') reportDone();
   if (!('caches' in window)) return;
   caches.open('olyx-state').then(c => c.put('state', new Response(JSON.stringify({ data, sync })))).catch(() => {});
 }
@@ -619,15 +648,13 @@ function renderToday() {
     ? data.habits.filter(h => !h.archived && L.cellStatus(data, h, y, t) === 'missed').length : 0;
   const empty = !active.length ? 'No habits yet. Add some in Plan.' : !planned.length ? 'Nothing scheduled for this day.' : '';
   const ps = viewDay === t ? L.perfectStreak(data, t) : 0;
-  // asked up front like any app: install (when the browser offers it) and the daily reminder
-  const askInstall = viewDay === t && installEvt && !standalone() && !ui.installNo;
-  const askRem = viewDay === t && !askInstall && canPush() && !(ui.reminder && ui.reminder.on) && !ui.remAsked
-    && Notification.permission !== 'denied' && data.habits.length;
+  // dismissed the start-up window? a small pill stays here to change your mind
+  const pills = viewDay === t ? [
+    wantsNotify() && ui.notifyNo ? `<button class="pill" data-act="ask-notify">${BELL}Turn on notifications</button>` : '',
+    wantsInstall() && ui.installNo ? `<button class="pill" data-act="install">${DOWN}Install app</button>` : '',
+  ].join('') : '';
   return `
-    ${askInstall ? `<div class="ask"><div class="ask-t"><b>Install OLYX</b><span>Get it on your home screen and open it like any other app.</span></div>
-      <div class="ask-row"><button class="btn primary" data-act="install">Install</button><button class="x" data-act="install-no" aria-label="Not now">×</button></div></div>` : ''}
-    ${askRem ? `<div class="ask"><div class="ask-t"><b>Daily reminder</b><span>One notification at your time with what's left to do.</span></div>
-      <div class="ask-row"><input type="time" id="asktime" value="21:00" aria-label="Reminder time"><button class="btn primary" data-act="ask-on">Turn on</button><button class="x" data-act="ask-no" aria-label="Not now">×</button></div></div>` : ''}
+    ${pills ? `<div class="pills">${pills}</div>` : ''}
     ${open ? `<div class="banner info"><span>Yesterday: ${open} not logged</span>
       <button data-act="review">Review</button><button class="x" data-act="dismiss" aria-label="Dismiss">×</button></div>` : ''}
     ${needBackup ? `<button class="banner" data-act="export">Back up your data — tap to export</button>` : ''}
@@ -780,9 +807,25 @@ function renderPlan() {
   // cards shrink as the fullest column grows, so ~10 habits still fit on one screen
   const most = Math.max(...cols.map(c => c.list.length));
   const density = most >= 9 ? 'dense' : most >= 6 ? 'compact' : '';
+  // phone: one row per habit with 7 day circles — tap to plan / unplan a day (the board below is for wide screens)
+  const planned = active.filter(h => h.freq.kind !== 'weekly');
+  const onDay = (h, d) => h.freq.kind === 'daily' || h.freq.days.includes(d);
+  const matrix = `<div class="pm">
+    <div class="pm-head"><span></span>${WD.map((d, i) => `<b class="${i === todayDow ? 'now' : ''}">${d[0]}</b>`).join('')}</div>
+    ${planned.map(h => `<div class="pm-row">
+      <button class="pm-name" data-act="edit" data-id="${esc(h.id)}"><span class="name">${esc(h.name)}</span>
+        <span class="note">${esc([h.freq.kind === 'daily' ? 'Every day' : freqText(h.freq), h.note].filter(Boolean).join(' · '))}</span></button>
+      ${WD.map((d, i) => `<button class="pm-d ${onDay(h, i) ? 'on' : ''} ${i === todayDow ? 'now' : ''}" data-act="pday" data-id="${esc(h.id)}" data-d="${i}"
+        aria-pressed="${onDay(h, i)}" aria-label="${esc(h.name)} on ${FULL[i]}"></button>`).join('')}
+    </div>`).join('') || '<p class="muted">No habits planned yet.</p>'}
+    ${planned.length ? `<div class="pm-count"><span>Habits per day</span>${WD.map((d, i) => `<b>${planned.filter(h => onDay(h, i)).length}</b>`).join('')}</div>` : ''}
+    <button class="add" data-act="new" data-col="any">+ Add habit</button>
+  </div>`;
   return `
     <h1 class="title">Weekly plan</h1>
-    <p class="muted">Add habits to the days you want to do them. "Every day" habits show up on every day.</p>
+    <p class="muted only-wide">Add habits to the days you want to do them. "Every day" habits show up on every day.</p>
+    <p class="muted only-narrow">Tap a circle to plan a habit on that day. Tap a name to edit it.</p>
+    ${matrix}
     <div class="board ${density}">${cols.map(c => `<section class="col${c.today ? ' today' : ''}">
       <header><b>${c.title}</b><span>${c.list.length}</span>${c.today ? '<em>Today</em>' : ''}</header>
       ${c.list.map(card).join('') || '<p class="muted empty-col">Nothing yet</p>'}
@@ -801,7 +844,7 @@ function renderPlan() {
 let addCol = null; // where "+ Add" was pressed: 'daily' | 'flex' | 0..6
 function sheet() {
   const isNew = editing === 'new';
-  const preset = addCol === 'daily' ? { kind: 'daily' } : addCol === 'flex' ? { kind: 'weekly', times: 3 } : { kind: 'days', days: [addCol] };
+  const preset = addCol === 'daily' || addCol === 'any' ? { kind: 'daily' } : addCol === 'flex' ? { kind: 'weekly', times: 3 } : { kind: 'days', days: [addCol] };
   const e = isNew ? { name: '', note: '', freq: preset } : data.habits.find(h => h.id === editing);
   if (!e) return '';
   const fv = e.freq.kind === 'weekly' ? 'w' + e.freq.times : e.freq.kind;
@@ -812,7 +855,7 @@ function sheet() {
   const day = typeof addCol === 'number' ? addCol : null;
   // same habit on several days = one habit (keeps its stats together)
   const existing = isNew && day !== null ? data.habits.filter(h => !h.archived && h.freq.kind === 'days' && !h.freq.days.includes(day)) : [];
-  const title = !isNew ? 'Edit habit' : day !== null ? `Add to ${FULL[day]}` : addCol === 'daily' ? 'Add every-day habit' : 'Add flexible habit';
+  const title = !isNew ? 'Edit habit' : day !== null ? `Add to ${FULL[day]}` : addCol === 'daily' ? 'Add every-day habit' : addCol === 'any' ? 'Add habit' : 'Add flexible habit';
   return `<div class="backdrop" data-act="cancel"></div>
     <form id="hform" class="sheet" data-kind="${fv === 'days' ? 'days' : ''}" role="dialog" aria-modal="true" aria-label="${title}">
       <h3>${title}</h3>
@@ -841,11 +884,10 @@ function renderSettings() {
     <h2>Effects</h2>
     ${seg('setmotion', ui.motion || 'system', [['system', 'System'], ['full', 'Full'], ['still', 'Still']])}
     <p class="muted">System: small animations always, big ones (confetti, rays) only if your device doesn't ask for reduced motion. Full: everything. Still: no animation. Saved per device.</p>
-    <h2>Daily reminder</h2>
-    ${!canPush() ? `<p class="muted">${PUSH_API ? 'This browser can\'t show reminders. On Android use Chrome and install OLYX to the home screen.' : 'Reminders are almost ready — they switch on with the next update.'}</p>` : `
-      <div class="remrow"><label>Time <input type="time" id="remtime" value="${(ui.reminder && ui.reminder.time) || '21:00'}"></label>
-        ${seg('setrem', ui.reminder && ui.reminder.on ? 'on' : 'off', [['on', 'On'], ['off', 'Off']])}</div>
-      <p class="muted">${esc(remStatus || (ui.reminder && ui.reminder.on ? `Every day at ${ui.reminder.time}, on the minute. It tells you what's left — or that the day is done.` : 'One notification a day with what is left to do.'))}</p>
+    <h2>Notifications</h2>
+    ${!canPush() ? '<p class="muted">This browser can\'t show notifications. On Android use Chrome and install OLYX to the home screen.</p>' : `
+      ${seg('setrem', ui.reminder && ui.reminder.on ? 'on' : 'off', [['on', 'On'], ['off', 'Off']])}
+      <p class="muted">${esc(remStatus || `Reminders at ${REMIND_TIMES} — only while something is still left. Once your day is complete, they stop for that day (on all your synced devices).`)}</p>
       ${ui.reminder && ui.reminder.on ? '<button class="btn" data-act="remtest">Send a test notification now</button>' : ''}`}
     <h2>App</h2>
     ${standalone() ? '<p class="muted">OLYX is installed on this device.</p>' : installEvt
@@ -875,9 +917,9 @@ function render() {
   document.body.classList.toggle('onboarding', !!onboard);
   if (onboard) { view.innerHTML = renderOnboard(); window.scrollTo(0, 0); applyMotion(); return; }
   view.innerHTML = { today: renderToday, plan: renderPlan, stats: renderStats, settings: renderSettings }[tab]()
-    + (detail ? detailSheet() : review ? reviewSheet() : '');
+    + (detail ? detailSheet() : review ? reviewSheet() : ask ? askModal() : '');
   view.classList.toggle('wide', tab === 'plan');
-  document.body.classList.toggle('locked', !!(editing || detail || review));
+  document.body.classList.toggle('locked', !!(editing || detail || review || ask));
   applyMotion();
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
   const name = document.querySelector('#hform input[name=name]');
@@ -1239,11 +1281,6 @@ function renderOnboard() {
       <div class="ob-bar"><button class="btn link" data-act="ob-done">Start empty</button>
         <button class="btn primary" data-act="ob-next" ${n ? '' : 'disabled'}>Continue${n ? ` · ${n}` : ''}</button></div></div>`;
   }
-  return `<div class="ob ob2">${LOGO}<h2 class="ob-h">A nudge in the evening?</h2>
-    <p class="muted">One quiet notification a day, only to remind you what's left.</p>
-    <label class="ob-time">Remind me at <input type="time" id="obtime" value="21:00"></label>
-    <button class="btn primary" data-act="ob-remind">Turn on reminder</button>
-    <button class="btn link" data-act="ob-done">Not now</button></div>`;
 }
 function finishOnboarding() {
   const t = today(), now = Date.now();
@@ -1263,27 +1300,51 @@ const VAPID_PUBLIC = 'BIkGEm4pxuy3W9NC7wtmgOSD6sgFsAYZ5SW4PsWu9qGJBFi0OuX6SvdUWa
 const canPush = () => !!PUSH_API && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 let remStatus = '';
 const b64u = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - s.length % 4) % 4)), c => c.charCodeAt(0));
-// quiet = refresh on app start (keeps time zone / server record current), no UI changes
-async function enableReminder(time, quiet = false) {
+// Reminders are automatic: 9:00, 18:00 and 21:00 local time, only while something is left that day.
+// uid groups this user's devices (derived from the sync gist when syncing), so finishing the day on one device
+// silences the rest of today's reminders everywhere. The server only ever learns "day X is done".
+const REMIND_TIMES = '9:00, 18:00 and 21:00';
+async function userId() {
+  const hex = b => [...b].map(x => x.toString(16).padStart(2, '0')).join('');
+  if (sync && sync.gistId) return hex(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('olyx:' + sync.gistId))).slice(0, 12));
+  if (!ui.uid) { ui.uid = hex(crypto.getRandomValues(new Uint8Array(12))); saveUi(); }
+  return ui.uid;
+}
+// quiet = refresh on app start (time zone, uid after sync changes); no UI
+async function enableReminder(quiet = false) {
   try {
     if (Notification.permission !== 'granted') {
       if (quiet || await Notification.requestPermission() !== 'granted') {
         if (!quiet) { remStatus = 'Notifications are blocked — allow them for OLYX in your phone / browser settings.'; render(); }
-        else { ui.reminder = { on: false, time }; saveUi(); }
+        else { ui.reminder = { on: false }; saveUi(); }
         return;
       }
     }
     const reg = await navigator.serviceWorker.ready;
     const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(VAPID_PUBLIC) });
     const r = await fetch(PUSH_API + '/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subscription: sub.toJSON(), time, tz: Intl.DateTimeFormat().resolvedOptions().timeZone }) });
+      body: JSON.stringify({ subscription: sub.toJSON(), tz: Intl.DateTimeFormat().resolvedOptions().timeZone, uid: await userId() }) });
     if (!r.ok) throw new Error('server said ' + r.status);
-    ui.reminder = { on: true, time }; saveUi(); snapshot();
+    ui.reminder = { on: true }; ui.doneSent = undefined; saveUi(); snapshot();
     if (quiet) return;
-    remStatus = `Every day at ${time}.`;
-    toast('Reminder on', `Every day at ${time}`);
-  } catch (e) { if (quiet) return; remStatus = 'Could not turn on the reminder: ' + e.message; }
+    remStatus = '';
+    toast('Notifications on', `${REMIND_TIMES} — only while something is left`);
+  } catch (e) { if (quiet) return; remStatus = 'Could not turn on notifications: ' + e.message; }
   render();
+}
+// tell the server when today becomes complete (or not any more) — only on change
+let doneTimer;
+function reportDone() {
+  if (!canPush() || !ui.reminder || !ui.reminder.on) return;
+  clearTimeout(doneTimer);
+  doneTimer = setTimeout(async () => {
+    const t = today(), day = L.isPerfect(data, t) ? t : null;
+    if (ui.doneSent === day) return;
+    try {
+      const r = await fetch(PUSH_API + '/done', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid: await userId(), day }) });
+      if (r.ok) { ui.doneSent = day; saveUi(); }
+    } catch (e) {} // offline: tried again on the next change / open
+  }, 800);
 }
 async function testReminder() {
   remStatus = 'Sending…'; render();
@@ -1300,7 +1361,7 @@ async function testReminder() {
 // install as an app (Android Chrome / desktop Chrome & Edge)
 let installEvt = null;
 const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; safeRender(); });
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; if (!editing && !detail && !review) { pickAsk(); render(); } });
 addEventListener('appinstalled', () => { installEvt = null; toast('OLYX installed', 'Open it from your home screen'); safeRender(); });
 async function installApp() {
   if (!installEvt) return;
@@ -1309,6 +1370,30 @@ async function installApp() {
   installEvt = null;
   render();
 }
+// ---- start-up windows: notifications, then install. Must be answered (X or confirm); X leaves a pill on Today ----
+const BELL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0"/></svg>';
+const DOWN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></svg>';
+const wantsNotify = () => canPush() && !(ui.reminder && ui.reminder.on) && Notification.permission !== 'denied';
+const wantsInstall = () => !!installEvt && !standalone();
+let ask = null; // 'notify' | 'install'
+function pickAsk() {
+  if (ask || onboard || !data.habits.length) return;
+  if (wantsNotify() && !ui.notifyNo) ask = 'notify';
+  else if (wantsInstall() && !ui.installNo) ask = 'install';
+}
+function askModal() {
+  const notify = ask === 'notify';
+  return `<div class="backdrop"></div>
+    <div class="sheet amodal" role="dialog" aria-modal="true" aria-label="${notify ? 'Notifications' : 'Install OLYX'}">
+      <button class="x" data-act="ask-x" aria-label="Close">×</button>
+      <div class="am-ico">${notify ? BELL : LOGO}</div>
+      <h3>${notify ? 'Don\'t break the chain' : 'Install OLYX'}</h3>
+      <p>${notify ? `OLYX reminds you at ${REMIND_TIMES} — only while something is still left. Nothing once your day is done.`
+        : 'Put OLYX on your home screen and open it like any other app — full screen, faster, works offline.'}</p>
+      <button class="btn primary" data-act="ask-yes">${notify ? 'Turn on notifications' : 'Install'}</button>
+    </div>`;
+}
+
 async function disableReminder() {
   try {
     const sub = await (await navigator.serviceWorker.ready).pushManager.getSubscription();
@@ -1317,8 +1402,8 @@ async function disableReminder() {
       await sub.unsubscribe();
     }
   } catch (e) {}
-  ui.reminder = { on: false, time: (ui.reminder && ui.reminder.time) || '21:00' }; saveUi();
-  remStatus = 'Reminder off.';
+  ui.reminder = { on: false }; saveUi();
+  remStatus = 'Notifications off.';
   render();
 }
 
@@ -1376,23 +1461,29 @@ document.addEventListener('click', ev => {
     case 'delete': if (h && confirm(`Delete "${h.name}" permanently?\n\nIts whole history will be removed, also on your other synced devices. This can't be undone.`)) {
       L.deleteHabit(data, id); save(); Sfx.play('remove');
     } break;
+    case 'pday': if (h) {
+      const d = Number(b.dataset.d), cur = h.freq.kind === 'daily' ? [0, 1, 2, 3, 4, 5, 6] : h.freq.days;
+      const days = cur.includes(d) ? cur.filter(x => x !== d) : [...cur, d].sort();
+      if (!days.length) { toast('At least one day', 'To stop a habit, archive it in Edit'); return; }
+      h.freq = days.length === 7 ? { kind: 'daily' } : { kind: 'days', days };
+      h.updated = Date.now(); save(); Sfx.play(cur.includes(d) ? 'soft' : 'pop');
+    } break;
     case 'addday': if (h && typeof addCol === 'number') {
       const days = [...h.freq.days, addCol].sort();
       h.freq = days.length === 7 ? { kind: 'daily' } : { kind: 'days', days };
       h.updated = Date.now(); editing = null; save(); Sfx.play('pop');
     } break;
     // onboarding
-    case 'ob-next': onboard.step++; if (onboard.step === 2 && !canPush()) { finishOnboarding(); } break;
+    case 'ob-next': if (onboard.step === 1) { finishOnboarding(); pickAsk(); } else onboard.step++; break;
     case 'ob-pick': { const k = b.dataset.k, i = onboard.picked.indexOf(k); i < 0 ? onboard.picked.push(k) : onboard.picked.splice(i, 1); Sfx.play(i < 0 ? 'pop' : 'soft'); break; }
     case 'ob-done': finishOnboarding(); break;
     case 'ob-sync': onboard = null; ui.onboarded = true; saveUi(); tab = 'settings'; break;
-    case 'ob-remind': { const time = document.getElementById('obtime').value || '21:00'; finishOnboarding(); enableReminder(time); break; }
     case 'remtest': testReminder(); return;
     case 'install': installApp(); return;
-    case 'install-no': ui.installNo = true; saveUi(); break;
-    case 'ask-on': ui.remAsked = true; saveUi(); enableReminder(document.getElementById('asktime').value || '21:00'); return;
-    case 'ask-no': ui.remAsked = true; saveUi(); break;
-    case 'setrem': if (b.dataset.v === 'on') enableReminder(document.getElementById('remtime').value || '21:00'); else disableReminder(); return;
+    case 'ask-x': if (ask === 'notify') ui.notifyNo = true; else ui.installNo = true; saveUi(); ask = null; pickAsk(); break;
+    case 'ask-yes': { const was = ask; ask = null; if (was === 'notify') { ui.notifyNo = true; saveUi(); enableReminder().then(() => { pickAsk(); render(); }); } else { ui.installNo = true; saveUi(); installApp(); } break; }
+    case 'ask-notify': enableReminder(); return;
+    case 'setrem': if (b.dataset.v === 'on') enableReminder(); else disableReminder(); return;
     // sound & effects
     case 'setsound': ui.sound = b.dataset.v === 'on'; saveUi(); Sfx.play('pop'); break;
     case 'setmotion': ui.motion = b.dataset.v; saveUi(); break;
@@ -1467,7 +1558,6 @@ document.addEventListener('keydown', ev => {
 
 // show weekday chips only for "Specific days"
 document.addEventListener('change', ev => {
-  if (ev.target.id === 'remtime') { const time = ev.target.value || '21:00'; if (ui.reminder && ui.reminder.on) enableReminder(time); else { ui.reminder = { on: false, time }; saveUi(); } return; }
   if (ev.target.name === 'freq') ev.target.form.dataset.kind = ev.target.value === 'days' ? 'days' : '';
 });
 
@@ -1499,8 +1589,9 @@ window.addEventListener('online', () => syncNow());
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().then(ok => { persisted = ok; if (tab === 'settings') render(); });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 
+pickAsk();
 // keep the reminder registration fresh (time zone, server record) every time the app opens
-if (canPush() && ui.reminder && ui.reminder.on) enableReminder(ui.reminder.time, true);
+if (canPush() && ui.reminder && ui.reminder.on) enableReminder(true).then(reportDone);
 // onboarding until it was finished once (also if the app was closed halfway through)
 if (!ui.onboarded && !data.habits.length && !Object.keys(data.log).length) onboard = { step: 0, picked: [] };
 // first days of a new month: show last month's review once

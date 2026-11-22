@@ -46,7 +46,11 @@ async function reminderText() {
   if (s.done === s.total) return { title: 'Day complete', body: ps > 1 ? `Perfect day locked in — ${ps} in a row.` : 'Everything done today. Nice work.' };
   const left = data.habits.filter(h => !h.archived && h.created <= t && L.isDue(data, h, t) && !L.isDone(data, h.id, t)).map(h => h.name);
   const n = left.length, names = left.slice(0, 3).join(', ') + (n > 3 ? ` +${n - 3}` : '');
-  return { title: `${n} habit${n === 1 ? '' : 's'} left today`, body: ps ? `Keep your ${ps}-day streak alive: ${names}` : names };
+  const plural = n === 1 ? '' : 's', hour = new Date().getHours();
+  // 9:00 = plan for the day, 18:00 = what's left, 21:00 = last call (protect the streak)
+  if (hour < 12) return { title: s.done ? `${n} to go today` : `Today: ${n} habit${plural}`, body: (ps ? `${ps}-day streak. ` : '') + names };
+  if (hour < 20) return { title: `${n} habit${plural} left today`, body: names };
+  return { title: ps ? `Keep your ${ps}-day streak alive` : 'Last call for today', body: `Still open: ${names}` };
 }
 
 self.addEventListener('push', e => {
