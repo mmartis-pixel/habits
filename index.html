@@ -255,20 +255,7 @@
   .ob0 p { color: var(--muted); font-size: 1.1rem; margin: 6px 0 36px; line-height: 1.5; }
   .ob0 .btn, .ob2 .btn { max-width: 340px; }
   .ob-h { font-size: 1.45rem; margin: 8px 0 4px; color: var(--text); }
-  .ob1 section { margin-top: 18px; }
-  .ob1 h3 { font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; }
-  .ob-chips { display: grid; gap: 6px; }
-  .ob-chip { display: flex; flex-direction: column; align-items: flex-start; text-align: left; padding: 11px 14px; border-radius: 12px;
-    border: 1px solid var(--line); background: var(--card); transition: border-color .15s, background .15s; }
-  .ob-chip span { font-size: .78rem; color: var(--muted); }
-  .ob-chip.on { border-color: var(--accent); background: rgb(52 211 153 / .1); }
-  .ob-chip.on b::before { content: '✓  '; color: var(--accent); }
-  .ob-bar { position: sticky; bottom: 0; display: flex; gap: 10px; align-items: center; margin-top: 20px; padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
-    background: var(--bg); box-shadow: 0 -16px 16px -4px var(--bg); }
-  .ob-bar .btn { margin: 0; }
-  .ob-bar .btn.link { width: auto; white-space: nowrap; }
   .btn:disabled { opacity: .45; }
-  .ob-time { display: flex; align-items: center; gap: 10px; margin: 18px 0 8px; color: var(--text); font-size: 1rem; }
   .remrow { display: flex; gap: 10px; align-items: end; }
   /* Plan on phones: habit × weekday circles; the column board stays for wide screens */
   .pm, .only-narrow { display: none; }
@@ -291,6 +278,12 @@
   .pm-count { padding: 9px 0 0; font-size: .72rem; color: var(--muted); }
   .pm-count b { text-align: center; color: var(--text); font-weight: 600; }
   .pm .add { width: 100%; margin-top: 14px; }
+  .ideas { margin: 10px 0 14px; padding: 12px; border-radius: 14px; border: 1px dashed rgb(52 211 153 / .4); }
+  .ideas > b { display: block; font-size: .85rem; margin-bottom: 8px; }
+  .ideas > div { display: flex; flex-wrap: wrap; gap: 6px; }
+  .idea { display: inline-flex; flex-direction: column; align-items: flex-start; padding: 7px 11px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--card); font-size: .85rem; font-weight: 600; text-align: left; }
+  .idea span { font-size: .7rem; font-weight: 400; color: var(--muted); }
   /* start-up windows + pills */
   .pills { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
   .pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px 6px 9px; border-radius: 999px; font-size: .8rem; font-weight: 600;
@@ -651,7 +644,7 @@ function renderToday() {
   // dismissed the start-up window? a small pill stays here to change your mind
   const pills = viewDay === t ? [
     wantsNotify() && ui.notifyNo ? `<button class="pill" data-act="ask-notify">${BELL}Turn on notifications</button>` : '',
-    wantsInstall() && ui.installNo ? `<button class="pill" data-act="install">${DOWN}Install app</button>` : '',
+    wantsInstall() && ui.installNo ? `<button class="pill" data-act="install-ask">${DOWN}Install app</button>` : '',
   ].join('') : '';
   return `
     ${pills ? `<div class="pills">${pills}</div>` : ''}
@@ -821,8 +814,13 @@ function renderPlan() {
     ${planned.length ? `<div class="pm-count"><span>Habits per day</span>${WD.map((d, i) => `<b>${planned.filter(h => onDay(h, i)).length}</b>`).join('')}</div>` : ''}
     <button class="add" data-act="new" data-col="any">+ Add habit</button>
   </div>`;
+  const names = new Set(data.habits.map(h => h.name.toLowerCase()));
+  const left = SUGGEST.map((s, i) => [s, i]).filter(([s]) => !names.has(s[0].toLowerCase()));
+  const ideas = active.length < 5 && left.length ? `<div class="ideas"><b>${active.length ? 'More ideas' : 'Start with a few of these'}</b>
+    <div>${left.map(([[name, note, f], i]) => `<button class="idea" data-act="suggest" data-i="${i}">+ ${name}<span>${[note, f ? freqText(f) : ''].filter(Boolean).join(' · ')}</span></button>`).join('')}</div></div>` : '';
   return `
     <h1 class="title">Weekly plan</h1>
+    ${ideas}
     <p class="muted only-wide">Add habits to the days you want to do them. "Every day" habits show up on every day.</p>
     <p class="muted only-narrow">Tap a circle to plan a habit on that day. Tap a name to edit it.</p>
     ${matrix}
@@ -915,7 +913,7 @@ function render() {
   const board = document.querySelector('.board');
   const boardScroll = board ? board.scrollLeft : null; // keep the board where it was when the dialog opens/closes
   document.body.classList.toggle('onboarding', !!onboard);
-  if (onboard) { view.innerHTML = renderOnboard(); window.scrollTo(0, 0); applyMotion(); return; }
+  if (onboard) { view.innerHTML = renderOnboard(); applyMotion(); return; }
   view.innerHTML = { today: renderToday, plan: renderPlan, stats: renderStats, settings: renderSettings }[tab]()
     + (detail ? detailSheet() : review ? reviewSheet() : ask ? askModal() : '');
   view.classList.toggle('wide', tab === 'plan');
@@ -1254,15 +1252,10 @@ async function shareImage(kind) {
   toast('Image saved', 'Check your downloads');
 }
 
-// ---- onboarding (first run only): welcome → starter habits → evening reminder ----
-const PACKS = [
-  { name: 'Morning', items: [['Wake up on time', 'Out of bed by 7:00'], ['Drink water', '500 ml right after waking'], ['Morning routine', 'Stretch, shower, plan the day']] },
-  { name: 'Fitness', items: [['Workout', '45 min', { kind: 'days', days: [0, 2, 4] }], ['Walk', '8,000 steps'], ['Stretch', '10 min']] },
-  { name: 'Nutrition', items: [['Protein with every meal', ''], ['No sugary drinks', ''], ['Creatine', '5 g']] },
-  { name: 'Sleep', items: [['Sleep 7+ hours', ''], ['Phone off before bed', '30 min before sleep'], ['Lights out by 23:00', '']] },
-  { name: 'Focus', items: [['Deep work', '90 min, phone in another room', { kind: 'days', days: [0, 1, 2, 3, 4] }], ['Read', '20 pages'], ['Plan tomorrow', '5 min in the evening']] },
-  { name: 'Mind', items: [['Meditate', '10 min'], ['Journal', '3 lines'], ['Gratitude', 'Write down one thing']] },
-];
+// ---- onboarding (first run only): just a welcome; habit ideas live in Plan ----
+// starter ideas shown in Plan while there are fewer than 5 habits; tap = added (no jumping around)
+const SUGGEST = [['Drink water', '500 ml right after waking'], ['Workout', '45 min', { kind: 'days', days: [0, 2, 4] }], ['Walk', '8,000 steps'],
+  ['Read', '20 pages'], ['Sleep 7+ hours', ''], ['Phone off before bed', '30 min before sleep'], ['Meditate', '10 min'], ['Plan tomorrow', '5 min in the evening']];
 const LOGO = '<svg class="logo" viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="lg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6ee7b7"/><stop offset="1" stop-color="#10b981"/></linearGradient></defs>'
   + '<path d="M60.7 18.8A33 33 0 1 0 81.2 39.3" fill="none" stroke="url(#lg1)" stroke-width="9.7" stroke-linecap="round"/><circle cx="73.3" cy="26.7" r="7" fill="#ecfdf5"/></svg>';
 let onboard = null; // { step, picked: ['pack:item', ...] }
@@ -1271,26 +1264,12 @@ function renderOnboard() {
     ${LOGO}<h1>OLYX</h1><p>Build habits that stick.<br>One day at a time.</p>
     <button class="btn primary" data-act="ob-next">Get started</button>
     <button class="btn link" data-act="ob-sync">I already use OLYX on another device</button></div>`;
-  if (onboard.step === 1) {
-    const n = onboard.picked.length;
-    return `<div class="ob ob1"><h2 class="ob-h">Pick a few habits to start</h2><p class="muted">Start small — 3 to 5 is plenty. You can change everything later in Plan.</p>
-      ${PACKS.map((p, i) => `<section><h3>${p.name}</h3><div class="ob-chips">${p.items.map(([name, note, f], j) => {
-        const k = `${i}:${j}`, on = onboard.picked.includes(k);
-        return `<button class="ob-chip ${on ? 'on' : ''}" data-act="ob-pick" data-k="${k}" aria-pressed="${on}"><b>${name}</b>${note || f ? `<span>${[note, f ? freqText(f) : ''].filter(Boolean).join(' · ')}</span>` : ''}</button>`;
-      }).join('')}</div></section>`).join('')}
-      <div class="ob-bar"><button class="btn link" data-act="ob-done">Start empty</button>
-        <button class="btn primary" data-act="ob-next" ${n ? '' : 'disabled'}>Continue${n ? ` · ${n}` : ''}</button></div></div>`;
-  }
 }
 function finishOnboarding() {
-  const t = today(), now = Date.now();
-  for (const k of onboard ? onboard.picked : []) {
-    const [i, j] = k.split(':').map(Number), [name, note, f] = PACKS[i].items[j];
-    data.habits.push({ id: L.newId(), name, note, type: 'check', freq: f || { kind: 'daily' }, created: t, archived: false, updated: now });
-  }
+  const t = today();
   onboard = null; ui.onboarded = true; saveUi(); save();
   tab = 'today'; viewDay = t;
-  if (data.habits.length) toast('Welcome to OLYX', 'Tick your first habit today');
+  tab = data.habits.length ? 'today' : 'plan'; // new users start in Plan, where the habit ideas are
   Sfx.play('pop');
 }
 
@@ -1373,11 +1352,14 @@ async function installApp() {
 // ---- start-up windows: notifications, then install. Must be answered (X or confirm); X leaves a pill on Today ----
 const BELL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0"/></svg>';
 const DOWN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></svg>';
-const wantsNotify = () => canPush() && !(ui.reminder && ui.reminder.on) && Notification.permission !== 'denied';
-const wantsInstall = () => !!installEvt && !standalone();
+// 'on' only counts if the browser still allows notifications (permission can be revoked in phone settings)
+const notifyOn = () => !!(ui.reminder && ui.reminder.on) && Notification.permission === 'granted';
+const wantsNotify = () => canPush() && !notifyOn() && Notification.permission !== 'denied';
+// install is offered whenever OLYX runs in a browser tab; without Chrome's prompt the window shows how to do it by hand
+const wantsInstall = () => !standalone();
 let ask = null; // 'notify' | 'install'
 function pickAsk() {
-  if (ask || onboard || !data.habits.length) return;
+  if (ask || onboard) return;
   if (wantsNotify() && !ui.notifyNo) ask = 'notify';
   else if (wantsInstall() && !ui.installNo) ask = 'install';
 }
@@ -1387,10 +1369,10 @@ function askModal() {
     <div class="sheet amodal" role="dialog" aria-modal="true" aria-label="${notify ? 'Notifications' : 'Install OLYX'}">
       <button class="x" data-act="ask-x" aria-label="Close">×</button>
       <div class="am-ico">${notify ? BELL : LOGO}</div>
-      <h3>${notify ? 'Don\'t break the chain' : 'Install OLYX'}</h3>
-      <p>${notify ? `OLYX reminds you at ${REMIND_TIMES} — only while something is still left. Nothing once your day is done.`
-        : 'Put OLYX on your home screen and open it like any other app — full screen, faster, works offline.'}</p>
-      <button class="btn primary" data-act="ask-yes">${notify ? 'Turn on notifications' : 'Install'}</button>
+      <h3>${notify ? 'Never miss a day' : 'Install OLYX'}</h3>
+      <p>${notify ? 'So nothing slips through the cracks.' : installEvt ? 'Open OLYX from your home screen like any other app.'
+        : 'In Chrome tap the menu <b>⋮</b> and choose <b>Install app</b> (or <b>Add to Home screen</b>).'}</p>
+      <button class="btn primary" data-act="ask-yes">${notify ? 'Turn on notifications' : installEvt ? 'Install' : 'Got it'}</button>
     </div>`;
 }
 
@@ -1474,15 +1456,17 @@ document.addEventListener('click', ev => {
       h.updated = Date.now(); editing = null; save(); Sfx.play('pop');
     } break;
     // onboarding
-    case 'ob-next': if (onboard.step === 1) { finishOnboarding(); pickAsk(); } else onboard.step++; break;
-    case 'ob-pick': { const k = b.dataset.k, i = onboard.picked.indexOf(k); i < 0 ? onboard.picked.push(k) : onboard.picked.splice(i, 1); Sfx.play(i < 0 ? 'pop' : 'soft'); break; }
-    case 'ob-done': finishOnboarding(); break;
+    case 'ob-next': finishOnboarding(); pickAsk(); break;
+    case 'suggest': { const [name, note, f] = SUGGEST[Number(b.dataset.i)];
+      data.habits.push({ id: L.newId(), name, note, type: 'check', freq: f || { kind: 'daily' }, created: today(), archived: false, updated: Date.now() });
+      save(); Sfx.play('pop'); toast('Added', name); break; }
     case 'ob-sync': onboard = null; ui.onboarded = true; saveUi(); tab = 'settings'; break;
     case 'remtest': testReminder(); return;
     case 'install': installApp(); return;
     case 'ask-x': if (ask === 'notify') ui.notifyNo = true; else ui.installNo = true; saveUi(); ask = null; pickAsk(); break;
     case 'ask-yes': { const was = ask; ask = null; if (was === 'notify') { ui.notifyNo = true; saveUi(); enableReminder().then(() => { pickAsk(); render(); }); } else { ui.installNo = true; saveUi(); installApp(); } break; }
     case 'ask-notify': enableReminder(); return;
+    case 'install-ask': if (installEvt) { installApp(); return; } ask = 'install'; break;
     case 'setrem': if (b.dataset.v === 'on') enableReminder(); else disableReminder(); return;
     // sound & effects
     case 'setsound': ui.sound = b.dataset.v === 'on'; saveUi(); Sfx.play('pop'); break;
@@ -1589,7 +1573,8 @@ window.addEventListener('online', () => syncNow());
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().then(ok => { persisted = ok; if (tab === 'settings') render(); });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 
-pickAsk();
+// notifications window right away; install waits a moment for Chrome's own install prompt
+if (wantsNotify() && !ui.notifyNo) pickAsk(); else setTimeout(() => { if (!ask && !editing && !detail && !review) { pickAsk(); render(); } }, 2500);
 // keep the reminder registration fresh (time zone, server record) every time the app opens
 if (canPush() && ui.reminder && ui.reminder.on) enableReminder(true).then(reportDone);
 // onboarding until it was finished once (also if the app was closed halfway through)
