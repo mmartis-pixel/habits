@@ -1577,7 +1577,12 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('online', () => syncNow());
 
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().then(ok => { persisted = ok; if (tab === 'settings') render(); });
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js');
+  // new version just installed → reload once so it shows now, not on the next open (only right after opening, never mid-edit)
+  const hadSw = !!navigator.serviceWorker.controller, openedAt = Date.now();
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadSw && Date.now() - openedAt < 8000 && !editing) location.reload(); });
+}
 
 // notifications window right away; install waits a moment for Chrome's own install prompt
 if (wantsNotify() && !ui.notifyNo) pickAsk(); else setTimeout(() => { if (!ask && !editing && !detail && !review) { pickAsk(); render(); } }, 2500);

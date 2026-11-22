@@ -1,12 +1,13 @@
-// Offline cache. Stale-while-revalidate: opens instantly from cache, fetches updates in the background
-// (new version shows on the next open). Bump CACHE when the file list changes.
+// Offline cache. Stale-while-revalidate: opens instantly from cache, fetches updates in the background.
+// Bump CACHE on every release: the new worker installs fresh files and the page reloads once during the
+// opening animation, so a new version shows on the first open.
 importScripts('logic.js'); // HabitLogic — used to build the reminder text
-const CACHE = 'olyx-v6';
+const CACHE = 'olyx-v10';
 const STATE = 'olyx-state'; // data snapshot written by the page (the worker can't read localStorage)
 const FILES = ['./', 'index.html', 'logic.js', 'manifest.json', 'icon-192.png', 'icon-512.png', 'icon-badge.png'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES.map(f => new Request(f, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {
@@ -20,7 +21,7 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
   e.respondWith(caches.open(CACHE).then(async c => {
     const cached = await c.match(e.request, { ignoreSearch: true });
-    const fresh = fetch(e.request).then(r => { if (r.ok) c.put(e.request, r.clone()); return r; }).catch(() => cached);
+    const fresh = fetch(e.request, { cache: 'no-cache' }).then(r => { if (r.ok) c.put(e.request, r.clone()); return r; }).catch(() => cached);
     return cached || fresh;
   }));
 });
