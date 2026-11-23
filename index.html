@@ -419,6 +419,7 @@
   .btns.secondary .btn { margin: 0; font-size: .85rem; padding: 10px 6px; color: var(--muted); }
   /* opening animation: continues Android's launch splash (same logo, same size), the white point runs one lap and lands.
      ponytail: 210px = Android 12+ splash (maskable icon at 240dp → ring ≈ 159dp); tune --sp if it ever stops matching */
+  html.twa #splash { --sp: 264px; } /* APK: icon-512 at 300dp → ring ≈ 200dp, same as ours at 264px */
   #splash { --sp: 210px; position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; background: var(--bg); animation: sp-out .4s ease 1.15s forwards; }
   #splash svg { width: var(--sp); height: var(--sp); overflow: visible; animation: sp-zoom .4s ease-in 1.15s forwards; }
   .sp-dot { transform-origin: 50px 50px; animation: sp-orbit .9s cubic-bezier(.55, 0, .25, 1) forwards; }
@@ -428,6 +429,11 @@
   @keyframes sp-zoom { to { transform: scale(1.15); } }
   @keyframes sp-out { to { opacity: 0; visibility: hidden; } }
 </style>
+<script>
+  // opened from the Android app (Trusted Web Activity): counts as installed; its launch splash shows the icon at 300dp
+  if (document.referrer.startsWith('android-app://')) sessionStorage.setItem('twa', '1');
+  if (sessionStorage.getItem('twa')) document.documentElement.classList.add('twa');
+</script>
 </head>
 <body>
 <div id="splash" aria-hidden="true"><svg viewBox="0 0 100 100"><defs><linearGradient id="splg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6ee7b7"/><stop offset="1" stop-color="#10b981"/></linearGradient></defs>
@@ -1350,7 +1356,7 @@ function reportDone() {
 }
 // install as an app (Android Chrome / desktop Chrome & Edge)
 let installEvt = null;
-const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true || document.documentElement.classList.contains('twa');
 addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; if (!editing && !detail && !review) { pickAsk(); render(); } });
 addEventListener('appinstalled', () => { installEvt = null; toast('OLYX installed', 'Open it from your home screen'); safeRender(); });
 async function installApp() {
