@@ -303,6 +303,7 @@
   .btn.link { background: none; border: 0; color: var(--muted); margin-top: 6px; padding: 8px; }
   .gbtn { min-height: 44px; margin: 8px 0; display: flex; justify-content: center; }
   .ob-or { margin: 22px 0 0; font-size: .85rem; color: var(--muted); }
+  .plink { color: var(--accent); }
   #toast .ti { display: block; margin: 0 auto 6px; width: 34px; height: 34px; color: var(--accent); }
   #toast .ti svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   #toast .ti svg text { fill: currentColor; stroke: none; font: 800 8px system-ui; }
@@ -524,7 +525,7 @@ const safeRender = () => { if (!editing) render(); };
 // ---- Account sync: "Continue with Google" → our server (worker olyx-reminders, D1). Data stays local-first;
 // the account copy is merged on each device (L.merge), pushes carry the rev they pulled (409 = pull + merge again).
 const SYNC_KEY = 'olyx-account'; // { session, email, uid } — kept apart from data so it never lands in an export
-const GOOGLE_CLIENT_ID = '';
+const GOOGLE_CLIENT_ID = '473320517458-sh8gicjmbgeli95a8avu1cdgqim83fke.apps.googleusercontent.com';
 localStorage.removeItem('habits-sync'); // old GitHub gist sync — replaced by the account (local data merges on sign-in)
 let sync = JSON.parse(localStorage.getItem(SYNC_KEY) || 'null');
 let syncStatus = '';
@@ -590,7 +591,7 @@ async function mountGoogle() {
     google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: r => signIn(r.credential), use_fedcm_for_button: true, use_fedcm_for_prompt: true });
     gsiInit = true;
   }
-  if (document.getElementById('gbtn') === el) google.accounts.id.renderButton(el, { theme: 'filled_black', size: 'large', shape: 'pill', text: 'continue_with', width: 280 });
+  if (document.getElementById('gbtn') === el) google.accounts.id.renderButton(el, { theme: 'filled_black', size: 'large', shape: 'pill', text: 'continue_with', width: 280, locale: 'en' });
 }
 async function signIn(credential) {
   syncStatus = 'Signing in…'; render();
@@ -920,7 +921,7 @@ function renderSettings() {
       <button class="btn" data-act="syncnow">Sync now</button>
       <button class="btn" data-act="signout">Sign out on this device</button>
       <button class="btn link" data-act="delacct">Delete my account data</button>` : `
-      <p class="muted">Sign in to back up your habits and use them on your phone and computer.</p>
+      <p class="muted">Sign in to back up your habits and use them on your phone and computer. <a href="privacy.html" class="plink">Privacy</a></p>
       <div id="gbtn" class="gbtn"></div>
       ${syncStatus ? `<p class="muted">${esc(syncStatus)}</p>` : ''}`}`;
 }

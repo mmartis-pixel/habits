@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OLYX — Privacy</title>
+<style>
+  body { margin: 0; background: #0f1115; color: #e8eaed; font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 32px 20px 64px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  h2 { font-size: 1rem; margin: 28px 0 6px; }
+  p, li { color: #c4c9d2; }
+  .muted { color: #8b93a1; font-size: .9rem; }
+  a { color: #34d399; }
+</style>
+</head>
+<body>
+<main>
+  <h1>OLYX privacy</h1>
+  <p class="muted">Last updated 23 November 2026</p>
+
+  <p>OLYX is a habit tracker. It keeps as little about you as it can, shows no ads, uses no analytics and never sells or shares your data.</p>
+
+  <h2>On your device</h2>
+  <p>Your habits, ticks and settings are stored in your browser on your device. Without an account nothing leaves the device.</p>
+
+  <h2>If you sign in with Google</h2>
+  <ul>
+    <li>We receive your Google account ID and email address from Google. We use them only to recognise your account. We get no access to your Google data (mail, contacts, files).</li>
+    <li>A copy of your habit data is stored on our server so it can sync between your devices.</li>
+    <li>Sign-in sessions are stored only as one-way hashes.</li>
+  </ul>
+
+  <h2>If you turn on notifications</h2>
+  <p>We store your browser's push address, your time zone and an anonymous ID so we can send reminders and skip them once your day is done. Turning notifications off deletes this.</p>
+
+  <h2>Where</h2>
+  <p>The server runs on Cloudflare (Workers, D1 and KV). Google provides sign-in.</p>
+
+  <h2>Deleting your data</h2>
+  <p>In OLYX go to Settings → Account → <b>Delete my account data</b>. This removes your habits, email and sessions from the server right away; your devices keep their local copy. Unused sessions also expire after a year.</p>
+
+  <h2>Contact</h2>
+  <p>Questions or requests: <a href="https://github.com/mmartis-pixel/habits/issues">open an issue on GitHub</a>.</p>
+
+  <p><a href="./">Back to OLYX</a></p>
+</main>
+</body>
+</html>
