@@ -1321,9 +1321,12 @@ async function userId() {
 // quiet = refresh on app start (time zone, uid after sync changes); no UI
 async function enableReminder(quiet = false) {
   try {
-    if (Notification.permission !== 'granted') {
-      const before = Notification.permission, p = quiet ? '' : await Notification.requestPermission();
-      if (!quiet) diag({ before, result: p, after: Notification.permission });
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    // a live push subscription is the real answer: Samsung Internet keeps reporting permission 'default'
+    // after the user allowed it (browsers drop the subscription when the permission is taken away)
+    if (!sub && Notification.permission !== 'granted') {
+      const p = quiet ? '' : await Notification.requestPermission();
       if (p !== 'granted') {
         if (!quiet) {
           // shown on Today too: the pill there gave no feedback before
@@ -1335,8 +1338,7 @@ async function enableReminder(quiet = false) {
         return;
       }
     }
-    const reg = await navigator.serviceWorker.ready;
-    const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(VAPID_PUBLIC) });
+    sub = sub || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(VAPID_PUBLIC) });
     const r = await fetch(PUSH_API + '/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ subscription: sub.toJSON(), tz: Intl.DateTimeFormat().resolvedOptions().timeZone, uid: await userId() }) });
     if (!r.ok) throw new Error('server said ' + r.status);
@@ -1344,15 +1346,8 @@ async function enableReminder(quiet = false) {
     if (quiet) return;
     remStatus = '';
     toast('Notifications on', `${REMIND_TIMES} — only while something is left`);
-  } catch (e) { if (quiet) return; diag({ err: e.name + ': ' + e.message }); remStatus = 'Could not turn on notifications: ' + e.message; toast('Notifications not on', e.message); }
+  } catch (e) { if (quiet) return; remStatus = 'Could not turn on notifications: ' + e.message; toast('Notifications not on', e.message); }
   render();
-}
-// ponytail: temporary — tells the worker log (`wrangler tail`) what the Android app's notification permission does; remove once fixed
-async function diag(o) {
-  const pq = await navigator.permissions.query({ name: 'notifications' }).then(s => s.state, () => '?');
-  const ua = (navigator.userAgent.match(/(Chrome|SamsungBrowser|EdgA|Firefox)\/[\d.]+/) || [''])[0];
-  fetch(PUSH_API + '/diag?' + new URLSearchParams({ ...o, pq, ua, twa: +document.documentElement.classList.contains('twa'),
-    dm: matchMedia('(display-mode: standalone)').matches ? 'standalone' : 'browser', ref: document.referrer })).catch(() => {});
 }
 // tell the server when today becomes complete (or not any more) — only on change
 let doneTimer;
@@ -1383,8 +1378,9 @@ async function installApp() {
 // ---- start-up windows: notifications, then install. Must be answered (X or confirm); X leaves a pill on Today ----
 const BELL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0"/></svg>';
 const DOWN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></svg>';
-// 'on' only counts if the browser still allows notifications (permission can be revoked in phone settings)
-const notifyOn = () => !!(ui.reminder && ui.reminder.on) && Notification.permission === 'granted';
+// 'on' = subscribed (checked against the browser's push subscription on every start). Not "=== 'granted'":
+// Samsung Internet reports 'default' even after the user allowed notifications
+const notifyOn = () => !!(ui.reminder && ui.reminder.on) && Notification.permission !== 'denied';
 const wantsNotify = () => canPush() && !notifyOn() && Notification.permission !== 'denied';
 // install is offered whenever OLYX runs in a browser tab; without Chrome's prompt the window shows how to do it by hand
 const wantsInstall = () => !standalone();
