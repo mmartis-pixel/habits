@@ -528,7 +528,8 @@ function persist() {
 // copy of the data (+ sync info) for the service worker, which can't read localStorage — used by reminders
 function snapshot() {
   if (typeof reportDone === 'function') reportDone();
-  if (NATIVE || !('caches' in window)) return; // the app has no service worker
+  if (NATIVE) return scheduleLocal(); // the app plans its own reminders; it has no service worker
+  if (!('caches' in window)) return;
   caches.open('olyx-state').then(c => c.put('state', new Response(JSON.stringify({ data, sync })))).catch(() => {});
 }
 function save() { persist(); scheduleSync(); }
@@ -1347,7 +1348,40 @@ async function userId() {
   return ui.uid;
 }
 // quiet = refresh on app start (time zone, uid after sync changes); no UI
+// ---- Android app: reminders scheduled on the phone (no server push). Every save/sync re-plans the next 7 days,
+// so finishing today cancels the rest of today. Ticks on another device show up after the app opens and syncs.
+const LN = () => Capacitor.Plugins.LocalNotifications;
+var localTimer; // var, not let: snapshot() can run during start-up before this line
+function scheduleLocal() { if (!NATIVE) return; clearTimeout(localTimer); localTimer = setTimeout(scheduleLocalNow, 1000); }
+async function scheduleLocalNow() {
+  clearTimeout(localTimer); localTimer = null;
+  try {
+    const pending = (await LN().getPending()).notifications || [];
+    if (pending.length) await LN().cancel({ notifications: pending.map(n => ({ id: n.id })) });
+    if (!(ui.reminder && ui.reminder.on)) return;
+    await LN().createChannel({ id: 'reminders', name: 'Daily reminders', description: `${REMIND_TIMES}, only while something is left`, importance: 4 });
+    await LN().schedule({ notifications: L.reminderPlan(data, new Date()).map(p => ({
+      id: p.id, title: p.title, body: p.body, channelId: 'reminders', schedule: { at: p.at, allowWhileIdle: true } })) });
+  } catch (e) {} // next save tries again
+}
+async function enableReminderNative(quiet) {
+  try {
+    let p = (await LN().checkPermissions()).display;
+    if (p !== 'granted' && !quiet) p = (await LN().requestPermissions()).display; // Android's own "Allow OLYX to send notifications?"
+    if (p !== 'granted') {
+      if (quiet) { ui.reminder = { on: false }; saveUi(); scheduleLocal(); return; }
+      remStatus = 'Notifications are blocked — allow them for OLYX in your phone settings (Apps → OLYX → Notifications).';
+      toast('Notifications not on', remStatus); render(); return;
+    }
+    ui.reminder = { on: true }; ui.doneSent = undefined; saveUi(); scheduleLocal();
+    if (quiet) return;
+    remStatus = '';
+    toast('Notifications on', `${REMIND_TIMES} — only while something is left`);
+  } catch (e) { if (quiet) return; remStatus = 'Could not turn on notifications: ' + e.message; toast('Notifications not on', e.message); }
+  render();
+}
 async function enableReminder(quiet = false) {
+  if (NATIVE) return enableReminderNative(quiet);
   try {
     const reg = await navigator.serviceWorker.ready;
     let sub = await reg.pushManager.getSubscription();
@@ -1434,6 +1468,7 @@ function askModal() {
 }
 
 async function disableReminder() {
+  if (NATIVE) { ui.reminder = { on: false }; saveUi(); await scheduleLocalNow(); remStatus = 'Notifications off.'; return render(); }
   try {
     const sub = await (await navigator.serviceWorker.ready).pushManager.getSubscription();
     if (sub) {
