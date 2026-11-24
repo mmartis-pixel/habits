@@ -302,6 +302,10 @@
   .remrow .seg { flex: 1; }
   .btn.link { background: none; border: 0; color: var(--muted); margin-top: 6px; padding: 8px; }
   .gbtn { min-height: 44px; margin: 8px 0; display: flex; justify-content: center; }
+  /* Android app: our own button in Google's dark pill style (the GIS button can't run in a WebView) */
+  .gnative { display: inline-flex; align-items: center; justify-content: center; gap: 10px; width: 280px; height: 44px; border-radius: 999px;
+    background: #131314; color: #e3e3e3; border: 1px solid #8e918f; font: 500 15px/1 system-ui, Roboto, sans-serif; }
+  .gnative svg { width: 20px; height: 20px; }
   .ob-or { margin: 22px 0 0; font-size: .85rem; color: var(--muted); }
   .plink { color: var(--accent); }
   #toast .ti { display: block; margin: 0 auto 6px; width: 34px; height: 34px; color: var(--accent); }
@@ -592,9 +596,29 @@ const loadGsi = () => window.google && google.accounts ? Promise.resolve() : new
   sc.src = 'https://accounts.google.com/gsi/client'; sc.onload = ok; sc.onerror = () => no(new Error('Could not load Google sign-in. Check your connection.'));
   document.head.appendChild(sc);
 });
+// in the Android app Google blocks web sign-in inside a WebView → Android's own account picker (Credential Manager).
+// The ID token is for the web client ID, so the server verifies it exactly like the web button's credential.
+const GLOGO = '<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.6 13.3l7.9 6.2C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.1 5.3-4.6 7l7.1 5.5c4.2-3.9 7.2-9.6 7.2-17z"/><path fill="#FBBC05" d="M10.5 28.5c-.5-1.4-.8-2.9-.8-4.5s.3-3.1.8-4.5l-7.9-6.2C1 16.6 0 20.2 0 24s1 7.4 2.6 10.7l7.9-6.2z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.1-5.5c-2 1.4-4.6 2.2-8.8 2.2-6.3 0-11.6-4.1-13.5-9.9l-7.9 6.2C6.6 42.6 14.6 48 24 48z"/></svg>';
+let socialInit = null;
+async function nativeGoogle() {
+  const S = Capacitor.Plugins.SocialLogin;
+  try {
+    socialInit = socialInit || S.initialize({ google: { webClientId: GOOGLE_CLIENT_ID, skipAuthOnlyAuthorizationAfterSignIn: true } });
+    await socialInit;
+    const res = await S.login({ provider: 'google', options: { scopes: ['email', 'profile'] } });
+    const token = res && res.result && res.result.idToken;
+    if (!token) throw new Error('Google returned no sign-in token');
+    await signIn(token);
+  } catch (e) {
+    socialInit = null; // retry initialize next time (e.g. offline on first try)
+    syncStatus = e && (e.code === 'USER_CANCELLED' || /cancel/i.test(e.message || '')) ? 'Sign-in cancelled' : 'Sign-in failed: ' + ((e && e.message) || e);
+    render();
+  }
+}
 async function mountGoogle() {
   const el = document.getElementById('gbtn');
   if (!el) return;
+  if (NATIVE) { el.innerHTML = `<button class="gnative" data-act="gnative">${GLOGO}Continue with Google</button>`; return; }
   try { await loadGsi(); } catch (e) { el.textContent = e.message; return; }
   if (!gsiInit) {
     google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: r => signIn(r.credential), use_fedcm_for_button: true, use_fedcm_for_prompt: true });
@@ -1494,6 +1518,7 @@ document.addEventListener('click', ev => {
       data.habits.push({ id: L.newId(), name, note, type: 'check', freq: f || { kind: 'daily' }, created: today(), archived: false, updated: Date.now() });
       save(); Sfx.play('pop'); toast('Added', name); break; }
     case 'install': installApp(); return;
+    case 'gnative': nativeGoogle(); return;
     case 'ask-x': if (ask === 'notify') ui.notifyNo = true; else ui.installNo = true; saveUi(); ask = null; pickAsk(); break;
     case 'ask-yes': { const was = ask; ask = null; if (was === 'notify') { ui.notifyNo = true; saveUi(); enableReminder().then(() => { pickAsk(); render(); }); } else { ui.installNo = true; saveUi(); installApp(); } break; }
     case 'ask-notify': enableReminder(); return;
