@@ -1322,8 +1322,14 @@ async function userId() {
 async function enableReminder(quiet = false) {
   try {
     if (Notification.permission !== 'granted') {
-      if (quiet || await Notification.requestPermission() !== 'granted') {
-        if (!quiet) { remStatus = 'Notifications are blocked — allow them for OLYX in your phone / browser settings.'; render(); }
+      const p = quiet ? '' : await Notification.requestPermission();
+      if (p !== 'granted') {
+        if (!quiet) {
+          // shown on Today too: the pill there gave no feedback before
+          remStatus = p === 'denied' ? 'Notifications are blocked — allow them for OLYX in your phone settings (Apps → OLYX → Notifications).'
+            : 'Notifications were not allowed. Tap again and choose Allow.';
+          toast('Notifications not on', remStatus); render();
+        }
         else { ui.reminder = { on: false }; saveUi(); }
         return;
       }
@@ -1337,7 +1343,7 @@ async function enableReminder(quiet = false) {
     if (quiet) return;
     remStatus = '';
     toast('Notifications on', `${REMIND_TIMES} — only while something is left`);
-  } catch (e) { if (quiet) return; remStatus = 'Could not turn on notifications: ' + e.message; }
+  } catch (e) { if (quiet) return; remStatus = 'Could not turn on notifications: ' + e.message; toast('Notifications not on', e.message); }
   render();
 }
 // tell the server when today becomes complete (or not any more) — only on change
