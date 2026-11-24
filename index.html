@@ -611,7 +611,8 @@ async function nativeGoogle() {
   try {
     socialInit = socialInit || S.initialize({ google: { webClientId: GOOGLE_CLIENT_ID, skipAuthOnlyAuthorizationAfterSignIn: true } });
     await socialInit;
-    const res = await S.login({ provider: 'google', options: { scopes: ['email', 'profile'] } });
+    // no `scopes`: on a stock Capacitor activity the plugin rejects any scopes list; email + profile are in the ID token by default
+    const res = await S.login({ provider: 'google', options: {} });
     const token = res && res.result && res.result.idToken;
     if (!token) throw new Error('Google returned no sign-in token');
     await signIn(token);
