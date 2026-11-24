@@ -2,7 +2,7 @@
 // Bump CACHE on every release: the new worker installs fresh files and the page reloads once during the
 // opening animation, so a new version shows on the first open.
 importScripts('logic.js'); // HabitLogic — used to build the reminder text
-const CACHE = 'olyx-v14';
+const CACHE = 'olyx-v15';
 const STATE = 'olyx-state'; // data snapshot written by the page (the worker can't read localStorage)
 const FILES = ['./', 'index.html', 'logic.js', 'manifest.json', 'icon-192.png', 'icon-512.png', 'icon-badge.png'];
 

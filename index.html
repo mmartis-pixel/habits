@@ -1322,7 +1322,8 @@ async function userId() {
 async function enableReminder(quiet = false) {
   try {
     if (Notification.permission !== 'granted') {
-      const p = quiet ? '' : await Notification.requestPermission();
+      const before = Notification.permission, p = quiet ? '' : await Notification.requestPermission();
+      if (!quiet) diag({ before, result: p, after: Notification.permission });
       if (p !== 'granted') {
         if (!quiet) {
           // shown on Today too: the pill there gave no feedback before
@@ -1343,8 +1344,15 @@ async function enableReminder(quiet = false) {
     if (quiet) return;
     remStatus = '';
     toast('Notifications on', `${REMIND_TIMES} — only while something is left`);
-  } catch (e) { if (quiet) return; remStatus = 'Could not turn on notifications: ' + e.message; toast('Notifications not on', e.message); }
+  } catch (e) { if (quiet) return; diag({ err: e.name + ': ' + e.message }); remStatus = 'Could not turn on notifications: ' + e.message; toast('Notifications not on', e.message); }
   render();
+}
+// ponytail: temporary — tells the worker log (`wrangler tail`) what the Android app's notification permission does; remove once fixed
+async function diag(o) {
+  const pq = await navigator.permissions.query({ name: 'notifications' }).then(s => s.state, () => '?');
+  const ua = (navigator.userAgent.match(/(Chrome|SamsungBrowser|EdgA|Firefox)\/[\d.]+/) || [''])[0];
+  fetch(PUSH_API + '/diag?' + new URLSearchParams({ ...o, pq, ua, twa: +document.documentElement.classList.contains('twa'),
+    dm: matchMedia('(display-mode: standalone)').matches ? 'standalone' : 'browser', ref: document.referrer })).catch(() => {});
 }
 // tell the server when today becomes complete (or not any more) — only on change
 let doneTimer;
