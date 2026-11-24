@@ -424,6 +424,11 @@
   /* opening animation: continues Android's launch splash (same logo, same size), the white point runs one lap and lands.
      ponytail: 210px = Android 12+ splash (maskable icon at 240dp → ring ≈ 159dp); tune --sp if it ever stops matching */
   html.twa #splash { --sp: 264px; } /* APK: icon-512 at 300dp → ring ≈ 200dp, same as ours at 264px */
+  /* Android app draws edge to edge: Capacitor 8 sets --safe-area-inset-* (falls back to env()) */
+  html.native { --sat: var(--safe-area-inset-top, env(safe-area-inset-top, 0px)); --sab: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)); }
+  html.native main { padding-top: calc(16px + var(--sat)); padding-bottom: calc(88px + var(--sab)); }
+  html.native nav { padding-bottom: var(--sab); }
+  html.native .sheet { padding-bottom: calc(18px + var(--sab)); max-height: calc(92vh - var(--sat)); }
   #splash { --sp: 210px; position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; background: var(--bg); animation: sp-out .4s ease 1.15s forwards; }
   #splash svg { width: var(--sp); height: var(--sp); overflow: visible; animation: sp-zoom .4s ease-in 1.15s forwards; }
   .sp-dot { transform-origin: 50px 50px; animation: sp-orbit .9s cubic-bezier(.55, 0, .25, 1) forwards; }
@@ -1299,6 +1304,7 @@ async function shareImage(kind) {
   text('Built one day at a time.', W - X, H - 120, font(500, 30), '#5b6270', 'right');
   const blob = await new Promise(r => c.toBlob(r, 'image/png'));
   const file = new File([blob], `olyx-${kind}-${t}.png`, { type: 'image/png' });
+  if (await shareFile(file.name, blob, title)) return;
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try { await navigator.share({ files: [file], title }); return; } catch (e) { if (e.name === 'AbortError') return; }
   }
@@ -1490,12 +1496,26 @@ function move(id, dir) {
   data.habits[idx].updated = data.habits[j].updated = Date.now(); // so the new order wins on sync
 }
 
-function exportData() {
+// Android app: WebViews can't download or use navigator.share → write to the app cache and open Android's share sheet.
+// Returns false on the web, where the caller keeps its browser path.
+async function shareFile(name, blob, title) {
+  if (!NATIVE) return false;
+  const data64 = await new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = no; r.readAsDataURL(blob); });
+  try {
+    const { uri } = await Capacitor.Plugins.Filesystem.writeFile({ path: name, data: data64, directory: 'CACHE' });
+    await Capacitor.Plugins.Share.share({ title, files: [uri] });
+  } catch (e) { if (!/cancel/i.test(e && e.message || '')) toast('Could not share', (e && e.message) || String(e)); }
+  return true;
+}
+
+async function exportData() {
   data.lastExport = today();
   save();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), name = `olyx-backup-${today()}.json`;
+  if (await shareFile(name, blob, 'OLYX backup')) return;
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
-  a.download = `olyx-backup-${today()}.json`;
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
@@ -1554,7 +1574,7 @@ document.addEventListener('click', ev => {
       save(); Sfx.play('pop'); toast('Added', name); break; }
     case 'install': installApp(); return;
     case 'gnative': nativeGoogle(); return;
-    case 'ask-x': if (ask === 'notify') ui.notifyNo = true; else ui.installNo = true; saveUi(); ask = null; pickAsk(); break;
+    case 'ask-x': dismissAsk(); break;
     case 'ask-yes': { const was = ask; ask = null; if (was === 'notify') { ui.notifyNo = true; saveUi(); enableReminder().then(() => { pickAsk(); render(); }); } else { ui.installNo = true; saveUi(); installApp(); } break; }
     case 'ask-notify': enableReminder(); return;
     case 'install-ask': if (installEvt) { installApp(); return; } ask = 'install'; break;
@@ -1625,6 +1645,19 @@ document.addEventListener('submit', ev => {
   save();
   render();
   nextCelebration();
+});
+
+// X on a start-up window (also Android back): remember the answer, a pill stays on Today
+function dismissAsk() { if (ask === 'notify') ui.notifyNo = true; else ui.installNo = true; saveUi(); ask = null; pickAsk(); }
+// Android back: close what's on top first; from Today with nothing open, leave the app
+if (NATIVE) Capacitor.Plugins.App.addListener('backButton', () => {
+  hideTip();
+  if (document.querySelector('.cel')) return closeCelebration();
+  if (ask) dismissAsk();
+  else if (editing || detail || review) editing = detail = review = null;
+  else if (tab !== 'today') { tab = 'today'; viewDay = today(); }
+  else return Capacitor.Plugins.App.exitApp();
+  render();
 });
 
 document.addEventListener('keydown', ev => {
