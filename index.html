@@ -1368,7 +1368,8 @@ async function scheduleLocalNow() {
     if (!(ui.reminder && ui.reminder.on)) return;
     await LN().createChannel({ id: 'reminders', name: 'Daily reminders', description: `${REMIND_TIMES}, only while something is left`, importance: 4 });
     await LN().schedule({ notifications: L.reminderPlan(data, new Date()).map(p => ({
-      id: p.id, title: p.title, body: p.body, channelId: 'reminders', schedule: { at: p.at, allowWhileIdle: true } })) });
+      // isExactNotification false: otherwise the plugin opens Android's "Alarms & reminders" settings (no exact-alarm permission on purpose)
+      id: p.id, title: p.title, body: p.body, channelId: 'reminders', isExactNotification: false, schedule: { at: p.at, allowWhileIdle: true } })) });
   } catch (e) {} // next save tries again
 }
 async function enableReminderNative(quiet) {
