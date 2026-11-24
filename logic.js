@@ -265,7 +265,35 @@
     };
   }
 
-  const api = { dayKey, addDays, weekStart, dow, isScheduled, isDone, isPaused, toggle, togglePause, merge, deleteHabit, weekCount, isDue, dayScore, isPerfect, perfectStreak,
+  // ---- reminders: one text per slot (9:00 plan, 18:00 what's left, 21:00 last call) ----
+  // skip = nothing worth a reminder (no habits, paused, nothing due, day complete); the service worker still shows the text
+  const REMIND_HOURS = [9, 18, 21];
+  function reminderText(data, at) {
+    const t = dayKey(at), hour = at.getHours();
+    if (!data || !data.habits.length) return { title: 'OLYX', body: 'Time for a quick check-in.', skip: true };
+    const s = dayScore(data, t), ps = perfectStreak(data, t);
+    if (isPaused(data, t) || !s.total) return { title: 'OLYX', body: 'Nothing planned today. Enjoy the rest.', skip: true };
+    if (s.done === s.total) return { title: 'Day complete', body: ps > 1 ? `Perfect day locked in — ${ps} in a row.` : 'Everything done today. Nice work.', skip: true };
+    const left = data.habits.filter(h => !h.archived && h.created <= t && isDue(data, h, t) && !isDone(data, h.id, t)).map(h => h.name);
+    const n = left.length, names = left.slice(0, 3).join(', ') + (n > 3 ? ` +${n - 3}` : '');
+    const plural = n === 1 ? '' : 's';
+    if (hour < 12) return { title: s.done ? `${n} to go today` : `Today: ${n} habit${plural}`, body: (ps ? `${ps}-day streak. ` : '') + names, skip: false };
+    if (hour < 20) return { title: `${n} habit${plural} left today`, body: names, skip: false };
+    return { title: ps ? `Keep your ${ps}-day streak alive` : 'Last call for today', body: `Still open: ${names}`, skip: false };
+  }
+  // the Android app's schedule: every slot after `now` for `days` days, id = stable slot number 1..days*3
+  function reminderPlan(data, now, days = 7) {
+    const out = [], [y, m, d] = dayKey(now).split('-').map(Number);
+    for (let i = 0; i < days; i++) REMIND_HOURS.forEach((hour, j) => {
+      const at = new Date(y, m - 1, d + i, hour);
+      if (at <= now) return;
+      const r = reminderText(data, at);
+      if (!r.skip) out.push({ id: i * REMIND_HOURS.length + j + 1, at, title: r.title, body: r.body });
+    });
+    return out;
+  }
+
+  const api = { reminderText, reminderPlan, REMIND_HOURS, dayKey, addDays, weekStart, dow, isScheduled, isDone, isPaused, toggle, togglePause, merge, deleteHabit, weekCount, isDue, dayScore, isPerfect, perfectStreak,
     streak, bestStreak, percent, percentBetween, monthStats, cellStatus, weakDay, validate, newId, defaultData };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.HabitLogic = api;

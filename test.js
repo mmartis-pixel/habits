@@ -297,4 +297,47 @@ assert.notStrictEqual(L.newId(), L.newId());
   assert.strictEqual(L.monthStats(d, '2026-11', T).days, 19);  // current month counts up to today
 }
 
+// --- reminders: text (service worker + app) and the app's 7-day schedule ---
+{
+  const h = (id, name) => ({ id, name, note: '', type: 'check', freq: { kind: 'daily' }, created: '2026-11-01', archived: false });
+  const two = (doneDays = {}, pauses = []) => data([h('a', 'Read'), h('b', 'Run')], doneDays, pauses);
+  const at = (key, hour, min = 0) => { const [y, m, d] = key.split('-').map(Number); return new Date(y, m - 1, d, hour, min); };
+  const prev = n => L.addDays(T, -n);
+
+  let r = L.reminderText(two(), at(T, 9));
+  assert.deepStrictEqual(r, { title: 'Today: 2 habits', body: 'Read, Run', skip: false });
+  r = L.reminderText(two({ a: [T] }), at(T, 18));
+  assert.deepStrictEqual(r, { title: '1 habit left today', body: 'Run', skip: false });
+  r = L.reminderText(two({ a: [prev(1), prev(2), prev(3)], b: [prev(1), prev(2), prev(3)] }), at(T, 21));
+  assert.deepStrictEqual(r, { title: 'Keep your 3-day streak alive', body: 'Still open: Read, Run', skip: false });
+  assert.strictEqual(L.reminderText(two({ a: [T], b: [T] }), at(T, 9)).skip, true);     // day complete
+  assert.strictEqual(L.reminderText(two({}, [T]), at(T, 9)).skip, true);                // paused
+  assert.strictEqual(L.reminderText(data([]), at(T, 9)).skip, true);                    // no habits
+  assert.deepStrictEqual(L.REMIND_HOURS, [9, 18, 21]);
+
+  // complete day: nothing more today, first reminder tomorrow 9:00
+  let p = L.reminderPlan(two({ a: [T], b: [T] }), at(T, 8));
+  assert.ok(p.every(x => L.dayKey(x.at) !== T));
+  assert.strictEqual(+p[0].at, +at(L.addDays(T, 1), 9));
+  // paused day: nothing that day
+  p = L.reminderPlan(two({}, [T]), at(T, 8));
+  assert.ok(p.every(x => L.dayKey(x.at) !== T));
+  // weekly quota met on Monday → nothing until next Monday
+  p = L.reminderPlan(data([weekly(1)], { w: ['2026-11-16'] }), at(T, 8));
+  assert.strictEqual(+p[0].at, +at('2026-11-23', 9));
+  // opened after 21:00: tomorrow onward, 6 days × 3
+  p = L.reminderPlan(two(), at(T, 21, 30));
+  assert.strictEqual(+p[0].at, +at(L.addDays(T, 1), 9));
+  assert.strictEqual(p.length, 18);
+  // DST weekend (Europe/Prague ends DST 2026-10-25): still 9/18/21 local, on the hour
+  p = L.reminderPlan(data([{ ...h('a', 'Read'), created: '2026-10-01' }]), new Date(2026, 9, 24, 10, 0));
+  assert.ok(p.length > 0 && p.every(x => [9, 18, 21].includes(x.at.getHours()) && x.at.getMinutes() === 0));
+  // stable unique ids 1..21
+  p = L.reminderPlan(two(), at(T, 0, 30));
+  const ids = p.map(x => x.id);
+  assert.strictEqual(new Set(ids).size, ids.length);
+  assert.ok(ids.every(i => i >= 1 && i <= 21));
+  assert.ok(p.every(x => x.title && x.body && x.at > at(T, 0, 30)));
+}
+
 console.log('all tests passed');
