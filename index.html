@@ -433,6 +433,8 @@
   // opened from the Android app (Trusted Web Activity): counts as installed; its launch splash shows the icon at 300dp
   if (document.referrer.startsWith('android-app://')) sessionStorage.setItem('twa', '1');
   if (sessionStorage.getItem('twa')) document.documentElement.classList.add('twa');
+  // the standalone Android app (Capacitor injects its bridge before page scripts): html.native switches the app-only paths
+  if (window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform()) document.documentElement.classList.add('native');
 </script>
 </head>
 <body>
@@ -463,6 +465,7 @@
 <input type="file" id="importFile" accept="application/json,.json" hidden>
 <script src="logic.js"></script>
 <script>
+const NATIVE = document.documentElement.classList.contains('native'); // running inside the Android app, not a browser
 const L = HabitLogic;
 const KEY = 'habits-v1';
 const today = () => L.dayKey(new Date());
@@ -521,7 +524,7 @@ function persist() {
 // copy of the data (+ sync info) for the service worker, which can't read localStorage — used by reminders
 function snapshot() {
   if (typeof reportDone === 'function') reportDone();
-  if (!('caches' in window)) return;
+  if (NATIVE || !('caches' in window)) return; // the app has no service worker
   caches.open('olyx-state').then(c => c.put('state', new Response(JSON.stringify({ data, sync })))).catch(() => {});
 }
 function save() { persist(); scheduleSync(); }
@@ -609,7 +612,7 @@ async function signIn(credential) {
     await syncNow(); // this device's habits + the account's habits, merged
     if (onboard) finishOnboarding();
     if (wasEmpty && data.habits.length) tab = 'today'; // new device: straight to the synced habits
-    if (canPush() && ui.reminder && ui.reminder.on) enableReminder(true); // reminders now grouped by account
+    if (canRemind() && ui.reminder && ui.reminder.on) enableReminder(true); // reminders now grouped by account
     toast('Signed in', r.email);
   } catch (e) { syncStatus = 'Sign-in failed: ' + e.message; }
   render();
@@ -909,7 +912,7 @@ function renderSettings() {
     ${seg('setmotion', ui.motion || 'system', [['system', 'System'], ['full', 'Full'], ['still', 'Still']])}
     <p class="muted">System: small animations always, big ones (confetti, rays) only if your device doesn't ask for reduced motion. Full: everything. Still: no animation. Saved per device.</p>
     <h2>Notifications</h2>
-    ${!canPush() ? '<p class="muted">This browser can\'t show notifications. On Android use Chrome and install OLYX to the home screen.</p>' : `
+    ${!canRemind() ? '<p class="muted">This browser can\'t show notifications. On Android use Chrome and install OLYX to the home screen.</p>' : `
       ${seg('setrem', ui.reminder && ui.reminder.on ? 'on' : 'off', [['on', 'On'], ['off', 'Off']])}
       <p class="muted">${esc(remStatus || `Reminders at ${REMIND_TIMES} — only while something is still left. Once your day is complete, they stop for that day (on all your synced devices).`)}</p>`}
     <h2>App</h2>
@@ -1306,6 +1309,7 @@ function finishOnboarding() {
 const PUSH_API = 'https://olyx-reminders.mmartis-99d.workers.dev'; // worker code: C:\Users\mmart\olyx-reminders
 const VAPID_PUBLIC = 'BIkGEm4pxuy3W9NC7wtmgOSD6sgFsAYZ5SW4PsWu9qGJBFi0OuX6SvdUWa0E5l4rVMY5cPhn4ybw54kKGdexX6M';
 const canPush = () => !!PUSH_API && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+const canRemind = () => NATIVE || canPush(); // the app schedules reminders on the device; the web uses Web Push
 let remStatus = '';
 const b64u = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - s.length % 4) % 4)), c => c.charCodeAt(0));
 // Reminders are automatic: 9:00, 18:00 and 21:00 local time, only while something is left that day.
@@ -1352,7 +1356,7 @@ async function enableReminder(quiet = false) {
 // tell the server when today becomes complete (or not any more) — only on change
 let doneTimer;
 function reportDone() {
-  if (!canPush() || !ui.reminder || !ui.reminder.on) return;
+  if (!canRemind() || !ui.reminder || !ui.reminder.on) return;
   clearTimeout(doneTimer);
   doneTimer = setTimeout(async () => {
     const t = today(), day = L.isPerfect(data, t) ? t : null;
@@ -1365,7 +1369,7 @@ function reportDone() {
 }
 // install as an app (Android Chrome / desktop Chrome & Edge)
 let installEvt = null;
-const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true || document.documentElement.classList.contains('twa');
+const standalone = () => NATIVE || matchMedia('(display-mode: standalone)').matches || navigator.standalone === true || document.documentElement.classList.contains('twa');
 addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; if (!editing && !detail && !review) { pickAsk(); render(); } });
 addEventListener('appinstalled', () => { installEvt = null; toast('OLYX installed', 'Open it from your home screen'); safeRender(); });
 async function installApp() {
@@ -1380,8 +1384,8 @@ const BELL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 
 const DOWN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></svg>';
 // 'on' = subscribed (checked against the browser's push subscription on every start). Not "=== 'granted'":
 // Samsung Internet reports 'default' even after the user allowed notifications
-const notifyOn = () => !!(ui.reminder && ui.reminder.on) && Notification.permission !== 'denied';
-const wantsNotify = () => canPush() && !notifyOn() && Notification.permission !== 'denied';
+const notifyOn = () => !!(ui.reminder && ui.reminder.on) && (NATIVE || Notification.permission !== 'denied');
+const wantsNotify = () => canRemind() && !notifyOn() && (NATIVE || Notification.permission !== 'denied'); // the app has no web Notification API
 // install is offered whenever OLYX runs in a browser tab; without Chrome's prompt the window shows how to do it by hand
 const wantsInstall = () => !standalone();
 let ask = null; // 'notify' | 'install'
@@ -1600,7 +1604,7 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('online', () => syncNow());
 
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().then(ok => { persisted = ok; if (tab === 'settings') render(); });
-if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator && !NATIVE) { // the app ships its files inside; updates come as new app versions
   navigator.serviceWorker.register('sw.js');
   // new version just installed → reload once so it shows now, not on the next open (only right after opening, never mid-edit)
   const hadSw = !!navigator.serviceWorker.controller, openedAt = Date.now();
@@ -1610,7 +1614,7 @@ if ('serviceWorker' in navigator) {
 // notifications window right away; install waits a moment for Chrome's own install prompt
 if (wantsNotify() && !ui.notifyNo) pickAsk(); else setTimeout(() => { if (!ask && !editing && !detail && !review) { pickAsk(); render(); } }, 2500);
 // keep the reminder registration fresh (time zone, server record) every time the app opens
-if (canPush() && ui.reminder && ui.reminder.on) enableReminder(true).then(reportDone);
+if (canRemind() && ui.reminder && ui.reminder.on) enableReminder(true).then(reportDone);
 // onboarding until it was finished once (also if the app was closed halfway through)
 if (!ui.onboarded && !data.habits.length && !Object.keys(data.log).length) onboard = { step: 0, picked: [] };
 // first days of a new month: show last month's review once
