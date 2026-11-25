@@ -355,7 +355,7 @@
   .rv-row em { font-style: normal; font-weight: 700; }
   .hsheet .btns, .rsheet .btns { margin-top: 12px; display: flex; gap: 8px; }
   .hsheet .btns .btn, .rsheet .btns .btn { margin: 0; }
-  .sheet.hsheet, .sheet.rsheet { background: var(--card); border: 1px solid var(--line); display: block;
+  .sheet.hsheet, .sheet.rsheet, .sheet.gsheet { background: var(--card); border: 1px solid var(--line); display: block;
     top: 50%; bottom: auto; transform: translate(-50%, -50%); width: min(520px, calc(100% - 24px)); max-height: 88vh; border-radius: 20px; padding: 18px 16px; }
   .mrev { width: 100%; display: flex; align-items: center; justify-content: space-between; text-align: left; margin-bottom: 12px; padding: 14px 16px;
     border-radius: 16px; border: 1px solid rgb(52 211 153 / .35); background: linear-gradient(135deg, rgb(52 211 153 / .12), rgb(59 130 246 / .06)); }
@@ -427,9 +427,9 @@
   /* gym */
   .gh { margin: 22px 0 8px; font-size: .95rem; color: var(--muted); }
   .grow { display: flex; gap: 8px; align-items: stretch; }
-  .gt { flex: 1; text-align: left; display: grid; gap: 2px; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--text); }
+  .gt { flex: 1; width: 100%; text-align: left; display: grid; gap: 2px; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--text); }
   .gt span { font-size: .8rem; }
-  .gs { padding: 0 14px; border-radius: 12px; border: 1px solid var(--accent); background: none; color: var(--accent); font-weight: 600; }
+  .gs { flex: none; padding: 0 14px; border-radius: 12px; border: 1px solid var(--accent); background: none; color: var(--accent); font-weight: 600; }
   .glinks { display: flex; gap: 8px; } .glinks .btn { width: auto; }
   .gdays { display: flex; gap: 6px; margin-bottom: 6px; }
   .gday { flex: 1; padding: 10px 0; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--muted); font-weight: 600; }
@@ -445,6 +445,20 @@
   .gmv { display: flex; gap: 4px; }
   .gmv button { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--line); background: var(--bg); color: var(--muted); }
   .gadd { display: flex; gap: 8px; margin: 6px 0; } .gadd input { flex: 1; min-width: 0; } .gadd .btn { width: auto; margin: 0; padding: 12px 16px; }
+  .gwork .gex { padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .gexh { display: flex; align-items: center; justify-content: space-between; }
+  .gexn { background: none; border: 0; padding: 0; color: var(--text); font-weight: 700; font-size: 1rem; text-align: left; }
+  .gx { width: 32px; height: 32px; border-radius: 9px; border: 1px solid var(--line); background: none; color: var(--muted); }
+  .gmeta { margin: 2px 0 8px; font-size: .8rem; }
+  .gset { display: grid; grid-template-columns: 22px 1fr 1fr 44px; gap: 8px; align-items: center; margin-bottom: 6px; }
+  .gset span { color: var(--muted); font-size: .85rem; text-align: center; }
+  .gset input { width: 100%; min-width: 0; padding: 10px; text-align: center; color: var(--muted); }
+  .gset input:focus, .gset.done input { color: var(--text); }
+  .gck { height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--muted); display: grid; place-items: center; }
+  .gck svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+  .gset.done .gck { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+  .gaddset { margin-top: 0; text-align: left; }
+  .cel-card.record .cel-num b { font-size: 4rem; }
   /* Android app draws edge to edge: Capacitor 8 sets --safe-area-inset-* (falls back to env()) */
   html.native { --sat: var(--safe-area-inset-top, env(safe-area-inset-top, 0px)); --sab: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)); }
   html.native main { padding-top: calc(16px + var(--sat)); padding-bottom: calc(88px + var(--sab)); }
@@ -1021,7 +1035,7 @@ function templateSheet() {
 
 function gymSheetHtml() {
   const k = gymSheet.kind;
-  return k === 'helper' ? helperSheet() : k === 'template' ? templateSheet()
+  return k === 'helper' ? helperSheet() : k === 'template' ? templateSheet() : k === 'workout' ? workoutSheet()
     : typeof gymMoreSheets === 'function' ? gymMoreSheets() : '';
 }
 
@@ -1084,8 +1098,11 @@ function gymAction(b) {
       if (!confirm(`Delete "${s.draft.name || 'this workout'}"? Past workouts stay.`)) return;
       L.deleteGym(data, 'templates', s.id, now); syncWorkoutHabit(); save(); gymSheet = null; Sfx.play('remove');
       break;
-    default:
-      if (typeof gymMoreAction === 'function' && gymMoreAction(b) === false) return;
+    default: {
+      const r = workoutAction(b);
+      if (r === false) return;
+      if (r === null && typeof gymMoreAction === 'function' && gymMoreAction(b) === false) return;
+    }
   }
   render();
 }
@@ -1098,8 +1115,105 @@ document.addEventListener('input', ev => {
   if (f === 'tname') gymSheet.draft.name = el.value;
   else if (f === 'tsets') gymSheet.draft.items[k].sets = el.value;
   else if (f === 'treps') gymSheet.draft.items[k].reps = el.value;
+  else if (f === 'wkg' || f === 'wreps') workoutInput(el, f);
   else if (typeof gymMoreInput === 'function') gymMoreInput(el, f);
 });
+
+// workout screen: set rows prefilled from last time (greyed until done), saved on every change
+const fmtSets = sets => sets.map(s => (typeof s.kg === 'number' ? `${s.kg} × ` : '') + s.reps).join(', ');
+function workoutSheet() {
+  const g = G(), w = g.workouts.find(x => x.id === gymSheet.id);
+  if (!w) { gymSheet = null; return ''; }
+  const tpl = g.templates.find(t => t.id === w.tpl);
+  return gymWrap(`${tpl ? tpl.name : 'Workout'} · ${label(w.day)}`, `
+    ${w.items.map((it, a) => {
+      const last = L.lastSets(data, it.ex, w.id), best = L.bestKg(data, it.ex, w.id);
+      return `<div class="gex"><div class="gexh"><button class="gexn" data-act="g-exo" data-id="${it.ex}">${esc(exName(it.ex))}</button>
+        <button class="gx" data-act="g-wexdel" data-a="${a}" aria-label="Remove ${esc(exName(it.ex))}">×</button></div>
+        <p class="muted gmeta">${[last && last.length ? 'last: ' + fmtSets(last) : '', best !== null ? `best ${best} kg` : ''].filter(Boolean).join(' · ') || 'First time'}</p>
+        ${it.sets.map((s, k) => `<div class="gset${s.done ? ' done' : ''}"><span>${k + 1}</span>
+          <input data-g="wkg" data-a="${a}" data-k="${k}" inputmode="decimal" placeholder="kg" value="${typeof s.kg === 'number' ? s.kg : ''}" aria-label="Set ${k + 1} kg">
+          <input data-g="wreps" data-a="${a}" data-k="${k}" inputmode="numeric" value="${s.reps}" aria-label="Set ${k + 1} reps">
+          <button class="gck" data-act="g-set" data-a="${a}" data-k="${k}" aria-label="Set ${k + 1} done" aria-pressed="${s.done}">${CHECK}</button></div>`).join('')}
+        <button class="btn link gaddset" data-act="g-addset" data-a="${a}">+ Add set</button></div>`;
+    }).join('')}
+    ${exPicker('g-wadd')}
+    <button class="btn primary" data-act="g-finish">${w.done ? 'Save' : 'Finish'}</button>
+    ${w.done ? '' : '<button class="btn link" data-act="g-discard">Discard workout</button>'}`, 'gwork');
+}
+function recordCard({ name, kg }) {
+  return `<div class="cel-card record">
+    <div class="cel-rays"></div>
+    <div class="cel-num"><b>${kg}</b><span>kg</span></div>
+    <div class="cel-title">New best</div>
+    <div class="cel-sub">${esc(name)}</div>
+    <button class="btn primary" data-act="celclose">Keep lifting</button>
+  </div>`;
+}
+// returns false when nothing changed (no re-render)
+function workoutAction(b) {
+  const w = gymSheet && G().workouts.find(x => x.id === gymSheet.id), a = Number(b.dataset.a), k = Number(b.dataset.k), now = Date.now();
+  switch (b.dataset.act) {
+    case 'g-start': {
+      const nw = L.startWorkout(data, today(), b.dataset.id || null, now);
+      save(); gymSheet = { kind: 'workout', id: nw.id }; Sfx.play('soft');
+      return true;
+    }
+    case 'g-set': {
+      const s = w.items[a].sets[k];
+      s.done = !s.done; w.updated = now; save();
+      if (s.done) { Sfx.play('tick', w.items.reduce((n, i) => n + i.sets.filter(x => x.done).length, 0)); if (navigator.vibrate) navigator.vibrate(8); }
+      else Sfx.play('untick');
+      return true;
+    }
+    case 'g-addset': {
+      const sets = w.items[a].sets, last = sets[sets.length - 1];
+      sets.push(last ? { ...last, done: false } : { reps: 8, done: false });
+      w.updated = now; save();
+      return true;
+    }
+    case 'g-wexdel':
+      if (w.items[a].sets.some(s => s.done) && !confirm(`Remove ${exName(w.items[a].ex)} and its sets from this workout?`)) return false;
+      w.items.splice(a, 1); w.updated = now; save();
+      return true;
+    case 'g-wadd': {
+      const name = (document.querySelector('[data-g=exname]').value || '').trim();
+      if (!name) return false;
+      const ex = L.ensureExercise(data, name, now);
+      w.items.push({ ex, sets: L.prefillSets(data, ex, 3, '8-12') });
+      w.updated = now; save();
+      return true;
+    }
+    case 'g-discard':
+      if (!confirm('Discard this workout? Its sets are not saved.')) return false;
+      L.deleteGym(data, 'workouts', w.id, now); save(); gymSheet = null; Sfx.play('remove');
+      return true;
+    case 'g-finish': {
+      if (w.done) { w.updated = now; save(); gymSheet = null; toast('Workout saved'); return true; } // editing a past workout: no tick, no records
+      const n = doneSets(w);
+      if (!n && !confirm('Finish without any completed sets?')) return false;
+      const { records } = L.finishWorkout(data, w.id, now);
+      for (const it of w.items) it.sets = it.sets.filter(s => s.done); // keep only what was lifted
+      w.items = w.items.filter(it => it.sets.length);
+      save(); gymSheet = null;
+      if (records.length) for (const r of records) queue.push({ kind: 'record', name: exName(r.ex), kg: r.kg });
+      else { Sfx.play('day'); toast('Workout done', `${n} set${n === 1 ? '' : 's'}`); }
+      render(); nextCelebration();
+      return false; // already rendered
+    }
+  }
+  return null; // not a workout action
+}
+function workoutInput(el, f) {
+  const w = G().workouts.find(x => x.id === gymSheet.id);
+  const s = w && w.items[Number(el.dataset.a)] && w.items[Number(el.dataset.a)].sets[Number(el.dataset.k)];
+  if (!s) return;
+  if (f === 'wkg') {
+    const v = parseFloat(el.value.replace(',', '.'));
+    if (el.value.trim() === '' || !isFinite(v) || v < 0) delete s.kg; else s.kg = Math.round(v * 100) / 100;
+  } else if (f === 'wreps') s.reps = Math.max(0, Math.min(10000, parseInt(el.value, 10) || 0));
+  w.updated = Date.now(); save();
+}
 
 function renderSettings() {
   return `
@@ -1184,17 +1298,18 @@ function applyMotion() {
 function nextCelebration() {
   if (document.querySelector('.cel') || !queue.length) return;
   const c = queue.shift();
-  Sfx.play(c.kind === 'tier' ? 'tier' : 'day');
+  Sfx.play(c.kind === 'day' ? 'day' : 'tier');
   const el = document.createElement('div');
   el.className = 'cel';
   el.setAttribute('role', 'dialog');
   el.setAttribute('aria-modal', 'true');
-  el.innerHTML = '<div class="cel-bg" data-act="celclose"></div>' + (c.kind === 'tier' ? tierCard(c) : dayCard(c));
+  el.innerHTML = '<div class="cel-bg" data-act="celclose"></div>' + (c.kind === 'tier' ? tierCard(c) : c.kind === 'record' ? recordCard(c) : dayCard(c));
   document.body.appendChild(el);
   document.body.classList.add('locked');
   el.querySelector('.cel-card button').focus({ preventScroll: true });
   el.querySelectorAll('[data-to]').forEach(countUp);
-  if (navigator.vibrate) navigator.vibrate(c.kind === 'tier' ? [20, 40, 20, 40, 80] : [15, 60, 15, 60, 30]);
+  if (navigator.vibrate) navigator.vibrate(c.kind === 'day' ? [15, 60, 15, 60, 30] : [20, 40, 20, 40, 80]);
+  if (c.kind === 'record') return setTimeout(() => burst(['#34d399', '#6ee7b7', '#fbbf24', '#ffffff'], 140), 150);
   const t = c.kind === 'tier' ? tierOf(c.n) : tierOf(c.ps);
   setTimeout(() => burst(c.kind === 'tier' ? TIER_COLORS[t].concat('#ffffff') : ['#34d399', '#6ee7b7', ...TIER_COLORS[t], '#ffffff'], c.kind === 'tier' ? 180 : 130), 150);
 }
