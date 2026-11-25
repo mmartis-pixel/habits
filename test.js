@@ -453,4 +453,25 @@ assert.notStrictEqual(L.newId(), L.newId());
   assert.strictEqual(L.startWorkout(d3, L.dayKey(new Date(2026, 10, 20, 2, 0)), null, 80).day, '2026-11-19');
 }
 
+// --- gym: own split keeps the Workout habit in step ---
+{
+  const d = data([daily()]);
+  const g = L.gymOf(d);
+  const bench = L.ensureExercise(d, 'Bench press', 5);
+  assert.strictEqual(L.ensureExercise(d, 'bench PRESS', 6), bench);           // reused by name
+  assert.strictEqual(g.exercises.length, 1);
+  g.templates.push({ id: 't1', name: 'Push', days: [1, 4], items: [{ ex: bench, sets: 3, reps: '8-12' }], updated: 5 });
+  const h = L.linkWorkoutHabit(d, T, 7);
+  assert.strictEqual(h.name, 'Workout');
+  assert.deepStrictEqual(h.freq, { kind: 'days', days: [1, 4] });
+  assert.strictEqual(g.habitId, h.id);
+  g.templates[0].days = [];                                                  // no days: link only, freq untouched
+  assert.strictEqual(L.linkWorkoutHabit(d, T, 8), h);
+  assert.deepStrictEqual(h.freq, { kind: 'days', days: [1, 4] });
+  const e = data([daily()]);
+  L.gymOf(e).templates.push({ id: 't2', name: 'Any', days: [], items: [], updated: 1 });
+  assert.strictEqual(L.linkWorkoutHabit(e, T, 9), null);                     // nothing planned, no habit yet: none created
+  assert.strictEqual(e.habits.length, 1);
+}
+
 console.log('all tests passed');

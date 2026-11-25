@@ -150,26 +150,33 @@
   // replace the split, reuse exercises by name, link (or create) the Workout habit and give it the split's days
   function applySplit(data, split, today, now = Date.now()) {
     const g = gymOf(data);
-    const exId = name => {
-      let e = g.exercises.find(x => x.name.toLowerCase() === name.toLowerCase());
-      if (!e) { e = { id: newId(), name, updated: now }; g.exercises.push(e); }
-      return e.id;
-    };
     for (const t of [...g.templates]) deleteGym(data, 'templates', t.id, now);
     for (const t of split) g.templates.push({ id: newId(), name: t.name, days: [...t.days],
-      items: t.items.map(i => ({ ex: exId(i.name), sets: i.sets, reps: i.reps })), updated: now });
-    const live = h => h && !h.archived;
+      items: t.items.map(i => ({ ex: ensureExercise(data, i.name, now), sets: i.sets, reps: i.reps })), updated: now });
+    return { habit: linkWorkoutHabit(data, today, now) };
+  }
+  // exercise id by name (any case); a new name creates the exercise
+  function ensureExercise(data, name, now = Date.now()) {
+    const g = gymOf(data), n = name.trim();
+    let e = g.exercises.find(x => x.name.toLowerCase() === n.toLowerCase());
+    if (!e) { e = { id: newId(), name: n, updated: now }; g.exercises.push(e); }
+    return e.id;
+  }
+  // link the Workout habit (linked one → one named "Workout" → new) and give it the days of the whole split.
+  // With no planned days it only links an existing habit and leaves its days alone; returns the habit or null.
+  function linkWorkoutHabit(data, today, now = Date.now()) {
+    const g = gymOf(data), live = h => h && !h.archived;
+    const days = [...new Set(g.templates.flatMap(t => t.days))].sort((x, y) => x - y);
     let habit = data.habits.find(h => h.id === g.habitId);
     if (!live(habit)) habit = data.habits.find(h => live(h) && h.name.trim().toLowerCase() === 'workout');
+    if (!habit && !days.length) return null;
     if (!habit) {
       habit = { id: newId(), name: 'Workout', note: '', type: 'check', freq: { kind: 'daily' }, created: today, archived: false };
       data.habits.push(habit);
     }
-    const days = [...new Set(split.flatMap(t => t.days))].sort((x, y) => x - y);
-    habit.freq = days.length === 7 ? { kind: 'daily' } : { kind: 'days', days };
-    habit.updated = now;
+    if (days.length) { habit.freq = days.length === 7 ? { kind: 'daily' } : { kind: 'days', days }; habit.updated = now; }
     g.habitId = habit.id;
-    return { habit };
+    return habit;
   }
 
   // ---- workouts: one unfinished draft at a time; sets prefilled from the last time ----
@@ -451,7 +458,7 @@
     return out;
   }
 
-  const api = { gymOf, mergeGym, deleteGym, GYM_LIBRARY, suggestSplit, applySplit, todayTemplate, lastSets, prefillSets, startWorkout, bestKg, finishWorkout, exerciseHistory, reminderText, reminderPlan, REMIND_HOURS, dayKey, addDays, weekStart, dow, isScheduled, isDone, isPaused, toggle, togglePause, merge, deleteHabit, weekCount, isDue, dayScore, isPerfect, perfectStreak,
+  const api = { gymOf, mergeGym, deleteGym, GYM_LIBRARY, suggestSplit, applySplit, ensureExercise, linkWorkoutHabit, todayTemplate, lastSets, prefillSets, startWorkout, bestKg, finishWorkout, exerciseHistory, reminderText, reminderPlan, REMIND_HOURS, dayKey, addDays, weekStart, dow, isScheduled, isDone, isPaused, toggle, togglePause, merge, deleteHabit, weekCount, isDue, dayScore, isPerfect, perfectStreak,
     streak, bestStreak, percent, percentBetween, monthStats, cellStatus, weakDay, validate, newId, defaultData };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.HabitLogic = api;
