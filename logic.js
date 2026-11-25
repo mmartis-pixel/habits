@@ -79,7 +79,42 @@
       else (out.log[day] = out.log[day] || []).push(id);
     }
     out.pauses.sort();
+    if (a.gym || b.gym) out.gym = mergeGym(a, b, deleted, out.habits);
     return out;
+  }
+
+  // ---- gym (optional data.gym): exercises, templates (the split), workouts. Items carry id + updated. ----
+  const GYM_LISTS = ['exercises', 'templates', 'workouts'];
+  function gymOf(data) {
+    const g = data.gym = data.gym || {};
+    for (const k of GYM_LISTS) g[k] = g[k] || [];
+    return g;
+  }
+  // per list: union by id, newer `updated` wins, deleted ids stay deleted
+  function mergeGym(a, b, deleted = {}, habits = []) {
+    const ga = a.gym || {}, gb = b.gym || {}, out = {};
+    for (const k of GYM_LISTS) {
+      const byId = new Map();
+      for (const x of [...(ga[k] || []), ...(gb[k] || [])]) {
+        if (deleted[x.id]) continue;
+        const cur = byId.get(x.id);
+        if (!cur || (x.updated || 0) > (cur.updated || 0)) byId.set(x.id, x);
+      }
+      out[k] = [...byId.values()].map(x => JSON.parse(JSON.stringify(x)));
+    }
+    const has = id => id && habits.some(h => h.id === id);
+    const habitId = has(ga.habitId) ? ga.habitId : gb.habitId || ga.habitId;
+    if (habitId) out.habitId = habitId;
+    return out;
+  }
+  // remove + tombstone; a deleted exercise leaves the templates, past workouts keep their sets
+  function deleteGym(data, list, id, now = Date.now()) {
+    const g = gymOf(data);
+    g[list] = g[list].filter(x => x.id !== id);
+    if (list === 'exercises') for (const t of g.templates) {
+      if (t.items.some(i => i.ex === id)) { t.items = t.items.filter(i => i.ex !== id); t.updated = now; }
+    }
+    (data.deleted = data.deleted || {})[id] = now;
   }
 
   // ---- schedule ----
@@ -250,7 +285,20 @@
       && !!o.log && typeof o.log === 'object' && !Array.isArray(o.log)
       && o.pauses.every(isKey)
       && Object.entries(o.log).every(([k, v]) => isKey(k) && Array.isArray(v))
-      && o.habits.every(h => h && typeof h.id === 'string' && typeof h.name === 'string' && isKey(h.created) && freqOk(h.freq));
+      && o.habits.every(h => h && typeof h.id === 'string' && typeof h.name === 'string' && isKey(h.created) && freqOk(h.freq))
+      && gymOk(o.gym);
+    function gymOk(g) {
+      if (g === undefined) return true;
+      if (!g || typeof g !== 'object') return false;
+      const list = k => g[k] === undefined || Array.isArray(g[k]);
+      const kgOk = kg => kg === undefined || (typeof kg === 'number' && isFinite(kg) && kg >= 0);
+      return GYM_LISTS.every(list)
+        && (g.exercises || []).every(e => e && typeof e.id === 'string' && typeof e.name === 'string')
+        && (g.templates || []).every(t => t && typeof t.id === 'string' && typeof t.name === 'string'
+          && Array.isArray(t.days) && t.days.every(d => int(d, 0, 6)) && Array.isArray(t.items))
+        && (g.workouts || []).every(w => w && typeof w.id === 'string' && isKey(w.day) && typeof w.done === 'boolean' && Array.isArray(w.items)
+          && w.items.every(i => i && Array.isArray(i.sets) && i.sets.every(s => s && int(s.reps, 0, 10000) && kgOk(s.kg))));
+    }
   }
 
   let seq = 0;
@@ -293,7 +341,7 @@
     return out;
   }
 
-  const api = { reminderText, reminderPlan, REMIND_HOURS, dayKey, addDays, weekStart, dow, isScheduled, isDone, isPaused, toggle, togglePause, merge, deleteHabit, weekCount, isDue, dayScore, isPerfect, perfectStreak,
+  const api = { gymOf, mergeGym, deleteGym, reminderText, reminderPlan, REMIND_HOURS, dayKey, addDays, weekStart, dow, isScheduled, isDone, isPaused, toggle, togglePause, merge, deleteHabit, weekCount, isDue, dayScore, isPerfect, perfectStreak,
     streak, bestStreak, percent, percentBetween, monthStats, cellStatus, weakDay, validate, newId, defaultData };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.HabitLogic = api;

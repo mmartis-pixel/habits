@@ -340,4 +340,38 @@ assert.notStrictEqual(L.newId(), L.newId());
   assert.ok(p.every(x => x.title && x.body && x.at > at(T, 0, 30)));
 }
 
+// --- gym: data ---
+{
+  const gymData = (gym) => Object.assign(data([daily()]), { gym });
+  const ex = (id, name, updated = 1) => ({ id, name, updated });
+  const wk = (id, day, items = [], done = true) => ({ id, day, items, done, updated: 1 });
+  assert.ok(L.validate(data([daily()])));
+  assert.ok(L.validate(gymData({ exercises: [], templates: [], workouts: [] })));
+  assert.ok(L.validate(gymData({ workouts: [wk('w1', T, [{ ex: 'e1', sets: [{ kg: 80, reps: 8, done: true }, { reps: 10, done: true }] }])] })));
+  assert.ok(!L.validate(gymData({ workouts: [wk('w1', 'x')] })));
+  assert.ok(!L.validate(gymData({ workouts: [wk('w1', T, [{ ex: 'e1', sets: [{ reps: -1, done: true }] }])] })));
+  assert.ok(!L.validate(gymData({ workouts: [wk('w1', T, [{ ex: 'e1', sets: [{ kg: 'heavy', reps: 5, done: true }] }])] })));
+  assert.ok(!L.validate(gymData({ templates: [{ id: 't1', name: 'Push', days: [7], items: [], updated: 1 }] })));
+
+  // merge: newer wins per id, union of workouts, tombstones drop
+  const A = gymData({ exercises: [ex('e1', 'Bench', 1)], templates: [], workouts: [wk('w1', T)] });
+  const B = gymData({ exercises: [ex('e1', 'Bench press', 2)], templates: [], workouts: [wk('w2', T)] });
+  let m = L.merge(A, B);
+  assert.strictEqual(m.gym.exercises.find(e => e.id === 'e1').name, 'Bench press');
+  assert.deepStrictEqual(m.gym.workouts.map(w => w.id).sort(), ['w1', 'w2']);
+  m = L.merge(Object.assign(A, { deleted: { e1: 5 } }), B);
+  assert.ok(!m.gym.exercises.some(e => e.id === 'e1'));
+  assert.ok(!('gym' in L.merge(data([daily()]), data([daily()]))));   // old data keeps its shape
+
+  // delete an exercise: templates drop it, past workouts keep it
+  const d = gymData({ exercises: [ex('e1', 'Bench press')], templates: [{ id: 't1', name: 'Push', days: [0], items: [{ ex: 'e1', sets: 3, reps: '8-12' }], updated: 1 }],
+    workouts: [wk('w1', T, [{ ex: 'e1', sets: [{ kg: 80, reps: 8, done: true }] }])] });
+  L.deleteGym(d, 'exercises', 'e1', 9);
+  assert.strictEqual(d.gym.exercises.length, 0);
+  assert.strictEqual(d.gym.templates[0].items.length, 0);
+  assert.strictEqual(d.gym.workouts[0].items[0].ex, 'e1');
+  assert.strictEqual(d.deleted.e1, 9);
+  assert.deepStrictEqual(L.gymOf(data([])), { exercises: [], templates: [], workouts: [] });
+}
+
 console.log('all tests passed');
