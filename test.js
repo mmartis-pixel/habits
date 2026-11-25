@@ -412,4 +412,45 @@ assert.notStrictEqual(L.newId(), L.newId());
   assert.ok(e.habits.includes(r.habit) && L.validate(e));
 }
 
+// --- gym: workouts ---
+{
+  const gymFix = () => Object.assign(data([daily()]), { gym: { habitId: 'd',
+    exercises: [{ id: 'e1', name: 'Bench press', updated: 1 }, { id: 'e2', name: 'Pull-up', updated: 1 }],
+    templates: [{ id: 't1', name: 'Push', days: [3], items: [{ ex: 'e1', sets: 3, reps: '8-12' }], updated: 1 }], workouts: [] } });
+  const d = gymFix();
+  assert.strictEqual(L.todayTemplate(d, T).id, 't1');                  // T is a Thursday
+  assert.strictEqual(L.todayTemplate(d, '2026-11-20'), null);
+  const w1 = L.startWorkout(d, T, 't1', 10);
+  assert.deepStrictEqual(w1.items[0].sets, [{ reps: 8, done: false }, { reps: 8, done: false }, { reps: 8, done: false }]);
+  assert.strictEqual(L.startWorkout(d, T, 't1', 11).id, w1.id);          // a draft is continued, not duplicated
+  w1.items[0].sets = [{ kg: 80, reps: 8, done: true }, { kg: 82.5, reps: 8, done: true }, { kg: 82.5, reps: 7, done: true }];
+  assert.deepStrictEqual(L.finishWorkout(d, w1.id, 20).records, []);   // first time ever: no record
+  assert.ok(L.isDone(d, 'd', T));                                       // linked habit ticked
+  const w2 = L.startWorkout(d, '2026-11-26', 't1', 30);
+  assert.deepStrictEqual(w2.items[0].sets.map(s => [s.kg, s.reps, s.done]), [[80, 8, false], [82.5, 8, false], [82.5, 7, false]]);
+  assert.deepStrictEqual(L.lastSets(d, 'e1', w2.id).map(s => s.kg), [80, 82.5, 82.5]);
+  w2.items[0].sets[0] = { kg: 85, reps: 6, done: true };
+  w2.items[0].sets.push({ kg: 90, reps: 1, done: false });             // not done: ignored
+  assert.deepStrictEqual(L.finishWorkout(d, w2.id, 40).records, [{ ex: 'e1', kg: 85 }]);
+  assert.strictEqual(L.bestKg(d, 'e1'), 85);
+  assert.strictEqual(L.bestKg(d, 'e1', w2.id), 82.5);
+  assert.deepStrictEqual(L.exerciseHistory(d, 'e1'), [{ day: T, kg: 82.5 }, { day: '2026-11-26', kg: 85 }]);
+  // bodyweight only: never a record, no NaN, not in the chart
+  const w3 = L.startWorkout(d, '2026-11-27', null, 50);
+  assert.deepStrictEqual(w3.items, []);
+  w3.items.push({ ex: 'e2', sets: [{ reps: 10, done: true }] });
+  assert.deepStrictEqual(L.finishWorkout(d, w3.id, 60).records, []);
+  assert.strictEqual(L.bestKg(d, 'e2'), null);
+  assert.deepStrictEqual(L.exerciseHistory(d, 'e2'), []);
+  assert.ok(L.validate(d));
+  // two drafts (from two devices): start picks one, adds none
+  const d2 = gymFix();
+  d2.gym.workouts.push({ id: 'a', day: T, items: [], done: false, updated: 1 }, { id: 'b', day: T, items: [], done: false, updated: 2 });
+  assert.ok(['a', 'b'].includes(L.startWorkout(d2, T, 't1', 70).id));
+  assert.strictEqual(d2.gym.workouts.length, 2);
+  // before 04:00 the workout belongs to the previous day
+  const d3 = gymFix();
+  assert.strictEqual(L.startWorkout(d3, L.dayKey(new Date(2026, 10, 20, 2, 0)), null, 80).day, '2026-11-19');
+}
+
 console.log('all tests passed');

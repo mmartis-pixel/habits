@@ -172,6 +172,61 @@
     return { habit };
   }
 
+  // ---- workouts: one unfinished draft at a time; sets prefilled from the last time ----
+  const finishedWorkouts = (g, excludeId) => g.workouts.filter(w => w.done && w.id !== excludeId);
+  const newestFirst = (x, y) => (x.day === y.day ? (y.updated || 0) - (x.updated || 0) : x.day < y.day ? 1 : -1);
+  const doneKgs = sets => sets.filter(s => s.done && typeof s.kg === 'number').map(s => s.kg);
+  function todayTemplate(data, day) {
+    return gymOf(data).templates.find(t => t.days.includes(dow(day))) || null;
+  }
+  // the done sets of this exercise in the most recent finished workout (other than excludeId)
+  function lastSets(data, exId, excludeId) {
+    const w = finishedWorkouts(gymOf(data), excludeId).filter(x => x.items.some(i => i.ex === exId)).sort(newestFirst)[0];
+    if (!w) return null;
+    return w.items.find(i => i.ex === exId).sets.filter(s => s.done).map(s => (typeof s.kg === 'number' ? { kg: s.kg, reps: s.reps } : { reps: s.reps }));
+  }
+  // `count` rows from last time (its last row repeats), else the target's lower bound ('8-12' → 8) with empty kg
+  function prefillSets(data, exId, count, reps) {
+    const last = lastSets(data, exId) || [], low = parseInt(reps, 10) || 8;
+    return Array.from({ length: count }, (_, k) => (last.length ? { ...last[Math.min(k, last.length - 1)], done: false } : { reps: low, done: false }));
+  }
+  function startWorkout(data, day, tplId, now = Date.now()) {
+    const g = gymOf(data), draft = g.workouts.find(w => !w.done);
+    if (draft) return draft;
+    const tpl = g.templates.find(t => t.id === tplId);
+    const w = { id: newId(), day, items: tpl ? tpl.items.map(i => ({ ex: i.ex, sets: prefillSets(data, i.ex, i.sets, i.reps) })) : [], done: false, updated: now };
+    if (tpl) w.tpl = tpl.id;
+    g.workouts.push(w);
+    return w;
+  }
+  function bestKg(data, exId, excludeId) {
+    let best = null;
+    for (const w of finishedWorkouts(gymOf(data), excludeId)) for (const i of w.items) {
+      if (i.ex === exId) for (const kg of doneKgs(i.sets)) if (best === null || kg > best) best = kg;
+    }
+    return best;
+  }
+  // records = beat a previous best (the very first time is not a record); ticks the linked habit on that day
+  function finishWorkout(data, id, now = Date.now()) {
+    const g = gymOf(data), w = g.workouts.find(x => x.id === id);
+    if (!w) return { records: [] };
+    const records = [];
+    for (const i of w.items) {
+      const kgs = doneKgs(i.sets), prev = bestKg(data, i.ex, id);
+      if (kgs.length && prev !== null && Math.max(...kgs) > prev && !records.some(r => r.ex === i.ex)) records.push({ ex: i.ex, kg: Math.max(...kgs) });
+    }
+    w.done = true;
+    w.updated = now;
+    if (g.habitId && data.habits.some(h => h.id === g.habitId) && !isDone(data, g.habitId, w.day)) toggle(data, g.habitId, w.day, now);
+    return { records };
+  }
+  // heaviest done kg per finished workout, oldest first (bodyweight-only workouts are skipped)
+  function exerciseHistory(data, exId) {
+    return finishedWorkouts(gymOf(data))
+      .map(w => { const kgs = doneKgs(w.items.filter(i => i.ex === exId).flatMap(i => i.sets)); return kgs.length ? { day: w.day, kg: Math.max(...kgs) } : null; })
+      .filter(Boolean).sort((x, y) => (x.day < y.day ? -1 : x.day > y.day ? 1 : 0));
+  }
+
   // ---- schedule ----
   // freq: { kind: 'daily' } | { kind: 'days', days: [0..6] } (0 = Monday) | { kind: 'weekly', times: 1..7 }
   const dow = key => (parse(key).getUTCDay() + 6) % 7;
@@ -396,7 +451,7 @@
     return out;
   }
 
-  const api = { gymOf, mergeGym, deleteGym, GYM_LIBRARY, suggestSplit, applySplit, reminderText, reminderPlan, REMIND_HOURS, dayKey, addDays, weekStart, dow, isScheduled, isDone, isPaused, toggle, togglePause, merge, deleteHabit, weekCount, isDue, dayScore, isPerfect, perfectStreak,
+  const api = { gymOf, mergeGym, deleteGym, GYM_LIBRARY, suggestSplit, applySplit, todayTemplate, lastSets, prefillSets, startWorkout, bestKg, finishWorkout, exerciseHistory, reminderText, reminderPlan, REMIND_HOURS, dayKey, addDays, weekStart, dow, isScheduled, isDone, isPaused, toggle, togglePause, merge, deleteHabit, weekCount, isDue, dayScore, isPerfect, perfectStreak,
     streak, bestStreak, percent, percentBetween, monthStats, cellStatus, weakDay, validate, newId, defaultData };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.HabitLogic = api;
