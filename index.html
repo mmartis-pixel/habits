@@ -459,6 +459,9 @@
   .gset.done .gck { background: var(--accent); border-color: var(--accent); color: var(--bg); }
   .gaddset { margin-top: 0; text-align: left; }
   .cel-card.record .cel-num b { font-size: 4rem; }
+  .gcards { margin: 4px 0 14px; } .gcards .card b { font-size: 1.1rem; }
+  .gchart { width: 100%; height: auto; display: block; }
+  .gcl { display: flex; justify-content: space-between; font-size: .75rem; color: var(--muted); margin-top: 4px; }
   /* Android app draws edge to edge: Capacitor 8 sets --safe-area-inset-* (falls back to env()) */
   html.native { --sat: var(--safe-area-inset-top, env(safe-area-inset-top, 0px)); --sab: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)); }
   html.native main { padding-top: calc(16px + var(--sat)); padding-bottom: calc(88px + var(--sab)); }
@@ -1036,7 +1039,7 @@ function templateSheet() {
 function gymSheetHtml() {
   const k = gymSheet.kind;
   return k === 'helper' ? helperSheet() : k === 'template' ? templateSheet() : k === 'workout' ? workoutSheet()
-    : typeof gymMoreSheets === 'function' ? gymMoreSheets() : '';
+    : k === 'past' ? pastSheet() : k === 'exercise' ? exerciseSheet() : '';
 }
 
 // keep the Workout habit in step with the split's days; tell the user when its days changed
@@ -1050,7 +1053,7 @@ function gymAction(b) {
   const s = gymSheet, v = b.dataset.v, k = Number(b.dataset.k), now = Date.now();
   const flip = (arr, x) => arr.includes(x) ? arr.filter(y => y !== x) : [...arr, x].sort((p, q) => p - q);
   switch (b.dataset.act) {
-    case 'g-close': gymSheet = null; break;
+    case 'g-close': gymSheet = (gymSheet && gymSheet.from) || null; break; // exercise detail returns to where it was opened
     case 'g-helper': gymSheet = { kind: 'helper', days: [], minutes: 60, goal: 'muscle' }; Sfx.play('soft'); break;
     case 'g-hday': s.days = flip(s.days, Number(v)); break;
     case 'g-hmin': s.minutes = Number(v); break;
@@ -1101,7 +1104,7 @@ function gymAction(b) {
     default: {
       const r = workoutAction(b);
       if (r === false) return;
-      if (r === null && typeof gymMoreAction === 'function' && gymMoreAction(b) === false) return;
+      if (r === null && pastAction(b) === false) return;
     }
   }
   render();
@@ -1116,7 +1119,6 @@ document.addEventListener('input', ev => {
   else if (f === 'tsets') gymSheet.draft.items[k].sets = el.value;
   else if (f === 'treps') gymSheet.draft.items[k].reps = el.value;
   else if (f === 'wkg' || f === 'wreps') workoutInput(el, f);
-  else if (typeof gymMoreInput === 'function') gymMoreInput(el, f);
 });
 
 // workout screen: set rows prefilled from last time (greyed until done), saved on every change
@@ -1213,6 +1215,58 @@ function workoutInput(el, f) {
     if (el.value.trim() === '' || !isFinite(v) || v < 0) delete s.kg; else s.kg = Math.round(v * 100) / 100;
   } else if (f === 'wreps') s.reps = Math.max(0, Math.min(10000, parseInt(el.value, 10) || 0));
   w.updated = Date.now(); save();
+}
+
+// past workout + exercise detail (heaviest weight per workout as a small line chart)
+const shortDay = k => `${Number(k.slice(8))} ${FULLMONTH[Number(k.slice(5, 7)) - 1].slice(0, 3)}`;
+function pastSheet() {
+  const g = G(), w = g.workouts.find(x => x.id === gymSheet.id);
+  if (!w) { gymSheet = null; return ''; }
+  const tpl = g.templates.find(t => t.id === w.tpl);
+  return gymWrap(`${tpl ? tpl.name : 'Workout'} · ${label(w.day)}`, `
+    ${w.items.length ? w.items.map(it => `<div class="gex"><button class="gexn" data-act="g-exo" data-id="${it.ex}">${esc(exName(it.ex))}</button>
+      <p class="muted gmeta">${esc(fmtSets(it.sets.filter(s => s.done))) || 'No completed sets'}</p></div>`).join('') : '<p class="muted">No completed sets.</p>'}
+    <button class="btn" data-act="g-pedit">Edit</button>
+    <button class="btn link" data-act="g-pdel">Delete workout</button>`);
+}
+function kgChart(points) {
+  if (points.length < 2) return '<p class="muted">Log this exercise twice to see a chart.</p>';
+  const W = 300, H = 120, P = 8, ks = points.map(p => p.kg), lo = Math.min(...ks), hi = Math.max(...ks), span = hi - lo || 1;
+  const xy = points.map((p, i) => [P + i * (W - 2 * P) / (points.length - 1), H - P - (p.kg - lo) / span * (H - 2 * P)].map(n => n.toFixed(1)));
+  return `<svg class="gchart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Heaviest weight per workout, ${lo} to ${hi} kg">
+    <polyline points="${xy.map(c => c.join(',')).join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    ${xy.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3.5" fill="var(--accent)"/>`).join('')}</svg>
+    <div class="gcl"><span>${shortDay(points[0].day)}</span><span>${lo === hi ? lo : `${lo}–${hi}`} kg</span><span>${shortDay(points[points.length - 1].day)}</span></div>`;
+}
+function exerciseSheet() {
+  const id = gymSheet.id, exists = G().exercises.some(e => e.id === id), hist = L.exerciseHistory(data, id), best = L.bestKg(data, id);
+  let top = null; // best set = heaviest done set, most reps at that weight
+  for (const w of G().workouts) if (w.done) for (const it of w.items) if (it.ex === id) for (const s of it.sets) {
+    if (s.done && typeof s.kg === 'number' && (!top || s.kg > top.kg || (s.kg === top.kg && s.reps > top.reps))) top = s;
+  }
+  return gymWrap(exName(id), `
+    <div class="cards gcards"><div class="card"><b>${best === null ? '—' : best + ' kg'}</b><span>Heaviest</span></div>
+      <div class="card"><b>${top ? `${top.kg} × ${top.reps}` : '—'}</b><span>Best set</span></div>
+      <div class="card"><b>${hist.length}</b><span>Workouts</span></div></div>
+    ${kgChart(hist)}
+    ${exists ? '<button class="btn link" data-act="g-exdel">Delete exercise</button>' : ''}`);
+}
+function pastAction(b) {
+  const now = Date.now();
+  switch (b.dataset.act) {
+    case 'g-past': gymSheet = { kind: 'past', id: b.dataset.id }; Sfx.play('soft'); return true;
+    case 'g-pedit': gymSheet = { kind: 'workout', id: gymSheet.id }; return true;
+    case 'g-pdel':
+      if (!confirm('Delete this workout? This cannot be undone.')) return false;
+      L.deleteGym(data, 'workouts', gymSheet.id, now); save(); gymSheet = null; Sfx.play('remove');
+      return true;
+    case 'g-exo': gymSheet = { kind: 'exercise', id: b.dataset.id, from: gymSheet }; Sfx.play('soft'); return true;
+    case 'g-exdel':
+      if (!confirm(`Delete ${exName(gymSheet.id)}? It leaves your split; past workouts keep their sets.`)) return false;
+      L.deleteGym(data, 'exercises', gymSheet.id, now); save(); gymSheet = null; Sfx.play('remove');
+      return true;
+  }
+  return null;
 }
 
 function renderSettings() {
