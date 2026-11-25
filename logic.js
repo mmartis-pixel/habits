@@ -117,6 +117,61 @@
     (data.deleted = data.deleted || {})[id] = now;
   }
 
+  // ---- split helper: proven splits by training days, no AI. Compound lifts first in every list. ----
+  const GYM_LIBRARY = {
+    push: ['Bench press', 'Overhead press', 'Incline dumbbell press', 'Dips', 'Lateral raise', 'Triceps pushdown', 'Cable fly'],
+    pull: ['Deadlift', 'Pull-up', 'Barbell row', 'Lat pulldown', 'Seated cable row', 'Face pull', 'Biceps curl'],
+    legs: ['Squat', 'Romanian deadlift', 'Leg press', 'Walking lunge', 'Leg curl', 'Leg extension', 'Calf raise'],
+    upper: ['Bench press', 'Barbell row', 'Overhead press', 'Pull-up', 'Incline dumbbell press', 'Lateral raise', 'Biceps curl'],
+    lower: ['Squat', 'Romanian deadlift', 'Leg press', 'Leg curl', 'Walking lunge', 'Leg extension', 'Calf raise'],
+    full: ['Squat', 'Bench press', 'Barbell row', 'Overhead press', 'Romanian deadlift', 'Pull-up', 'Plank'],
+  };
+  const SPLITS = { 2: ['Full body A', 'Full body B'], 3: ['Push', 'Pull', 'Legs'], 4: ['Upper', 'Lower', 'Upper', 'Lower'],
+    5: ['Push', 'Pull', 'Legs', 'Upper', 'Lower'], 6: ['Push', 'Pull', 'Legs', 'Push', 'Pull', 'Legs'] };
+  const SPLIT_LIB = { 'Full body A': ['full', 0], 'Full body B': ['full', 3], Push: ['push', 0], Pull: ['pull', 0], Legs: ['legs', 0], Upper: ['upper', 0], Lower: ['lower', 0] };
+  // days: weekdays 0..6 (2–6 of them) → [{ name, days, items: [{ name, sets, reps }] }]; same name = one template on several days
+  function suggestSplit({ days, minutes, goal }) {
+    const ds = [...days].sort((x, y) => x - y), seq = SPLITS[ds.length] || [];
+    const n = { 45: 4, 60: 5, 90: 7 }[minutes] || 5, out = [];
+    seq.forEach((name, i) => {
+      let t = out.find(x => x.name === name);
+      if (!t) {
+        const [lib, start] = SPLIT_LIB[name], list = GYM_LIBRARY[lib];
+        t = { name, days: [], items: Array.from({ length: n }, (_, j) => {
+          const heavy = goal === 'strength' && j < 2;
+          return { name: list[(start + j) % list.length], sets: heavy ? 4 : 3, reps: heavy ? '4-6' : goal === 'strength' ? '8-10' : '8-12' };
+        }) };
+        out.push(t);
+      }
+      t.days.push(ds[i]);
+    });
+    return out;
+  }
+  // replace the split, reuse exercises by name, link (or create) the Workout habit and give it the split's days
+  function applySplit(data, split, today, now = Date.now()) {
+    const g = gymOf(data);
+    const exId = name => {
+      let e = g.exercises.find(x => x.name.toLowerCase() === name.toLowerCase());
+      if (!e) { e = { id: newId(), name, updated: now }; g.exercises.push(e); }
+      return e.id;
+    };
+    for (const t of [...g.templates]) deleteGym(data, 'templates', t.id, now);
+    for (const t of split) g.templates.push({ id: newId(), name: t.name, days: [...t.days],
+      items: t.items.map(i => ({ ex: exId(i.name), sets: i.sets, reps: i.reps })), updated: now });
+    const live = h => h && !h.archived;
+    let habit = data.habits.find(h => h.id === g.habitId);
+    if (!live(habit)) habit = data.habits.find(h => live(h) && h.name.trim().toLowerCase() === 'workout');
+    if (!habit) {
+      habit = { id: newId(), name: 'Workout', note: '', type: 'check', freq: { kind: 'daily' }, created: today, archived: false };
+      data.habits.push(habit);
+    }
+    const days = [...new Set(split.flatMap(t => t.days))].sort((x, y) => x - y);
+    habit.freq = days.length === 7 ? { kind: 'daily' } : { kind: 'days', days };
+    habit.updated = now;
+    g.habitId = habit.id;
+    return { habit };
+  }
+
   // ---- schedule ----
   // freq: { kind: 'daily' } | { kind: 'days', days: [0..6] } (0 = Monday) | { kind: 'weekly', times: 1..7 }
   const dow = key => (parse(key).getUTCDay() + 6) % 7;
@@ -341,7 +396,7 @@
     return out;
   }
 
-  const api = { gymOf, mergeGym, deleteGym, reminderText, reminderPlan, REMIND_HOURS, dayKey, addDays, weekStart, dow, isScheduled, isDone, isPaused, toggle, togglePause, merge, deleteHabit, weekCount, isDue, dayScore, isPerfect, perfectStreak,
+  const api = { gymOf, mergeGym, deleteGym, GYM_LIBRARY, suggestSplit, applySplit, reminderText, reminderPlan, REMIND_HOURS, dayKey, addDays, weekStart, dow, isScheduled, isDone, isPaused, toggle, togglePause, merge, deleteHabit, weekCount, isDue, dayScore, isPerfect, perfectStreak,
     streak, bestStreak, percent, percentBetween, monthStats, cellStatus, weakDay, validate, newId, defaultData };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.HabitLogic = api;
