@@ -478,6 +478,13 @@
   .glr span { flex: 1; } .glr .gs { padding: 6px 14px; }
   .gi { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); background: none; color: var(--muted); font: italic 700 .9rem Georgia, serif; }
   .gsheet input[data-g=wname], .gsheet input[data-g=libq] { width: 100%; box-sizing: border-box; }
+  .gmus { margin: 2px 0 8px; }
+  .gmap { display: flex; justify-content: center; gap: 20px; margin-bottom: 10px; } .gmap .mmap { height: 180px; width: auto; }
+  .gsteps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .gsteps figure { margin: 0; } .gsteps .pose { width: 100%; height: auto; display: block; }
+  .gsteps figcaption { font-size: .75rem; color: var(--muted); margin-top: 4px; line-height: 1.3; } .gsteps figcaption b { color: var(--text); }
+  .gexsheet a.btn { display: block; text-align: center; text-decoration: none; }
+  .gcredit { font-size: .7rem; margin-top: 10px; }
   /* Android app draws edge to edge: Capacitor 8 sets --safe-area-inset-* (falls back to env()) */
   html.native { --sat: var(--safe-area-inset-top, env(safe-area-inset-top, 0px)); --sab: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)); }
   html.native main { padding-top: calc(16px + var(--sat)); padding-bottom: calc(88px + var(--sab)); }
@@ -1029,16 +1036,19 @@ function renderGym() {
 }
 
 function helperSheet() {
-  const s = gymSheet, ok = s.days.length >= 2 && s.days.length <= 6;
-  s.preview = ok ? L.suggestSplit(s) : null;
+  const s = gymSheet;
+  s.preview = L.suggestSplit({ perWeek: s.perWeek, daysOff: s.off, minutes: s.minutes, style: s.style });
   return gymWrap('Suggest a split', `
-    <p class="muted">Which days do you train?</p>${dayChips('g-hday', s.days)}
+    <p class="muted">How many times a week?</p>${seg('g-hper', s.perWeek, [2, 3, 4, 5, 6].map(n => [n, String(n)]))}
+    <p class="muted">Days off (optional)</p>${dayChips('g-hoff', s.off)}
     <p class="muted">How long is a session?</p>${seg('g-hmin', s.minutes, [[45, '45 min'], [60, '60 min'], [90, '90 min']])}
-    <p class="muted">Goal</p>${seg('g-hgoal', s.goal, [['strength', 'Strength'], ['muscle', 'Muscle']])}
-    ${ok ? `<div class="gprev">${s.preview.map(p => `<div class="card"><b>${esc(p.name)}</b> <span class="muted">${dayList(p.days)}</span>
-      <p class="muted">${p.items.map(i => `${esc(i.name)} ${i.sets}×${i.reps}`).join(', ')}</p></div>`).join('')}</div>
+    <div class="gstyle"><div class="gsl"><span>Strength</span><span>Training style</span><span>Hypertrophy</span></div>
+      <input type="range" min="0" max="4" step="1" value="${s.style}" data-g="hstyle" aria-label="Training style, strength to hypertrophy">
+      <p class="muted ghint">${styleHint(L.STYLES[s.style])}</p></div>
+    ${s.preview.length ? `<div class="gprev">${s.preview.map(p => `<div class="card"><b>${esc(p.name)}</b> <span class="muted">${dayList(p.days)}</span>
+      <p class="muted">${p.items.map(i => esc(EX.byKey(i.lib).name)).join(', ')}</p></div>`).join('')}</div>
       <button class="btn primary" data-act="g-happly">Use this split</button>`
-    : `<p class="muted">Pick 2 to 6 days.</p>`}`);
+    : '<p class="muted">Not enough free days. Pick fewer days off or train fewer times a week.</p>'}`);
 }
 
 // My week: weekday chips on top, the chosen day's workout below. A name picked from the list shares that workout.
@@ -1113,15 +1123,15 @@ function gymAction(b) {
   const flip = (arr, x) => arr.includes(x) ? arr.filter(y => y !== x) : [...arr, x].sort((p, q) => p - q);
   switch (b.dataset.act) {
     case 'g-close': gymSheet = (gymSheet && gymSheet.from) || null; break; // exercise detail returns to where it was opened
-    case 'g-helper': gymSheet = { kind: 'helper', days: [], minutes: 60, goal: 'muscle' }; Sfx.play('soft'); break;
-    case 'g-hday': s.days = flip(s.days, Number(v)); break;
+    case 'g-helper': gymSheet = { kind: 'helper', perWeek: 3, off: [], minutes: 60, style: Number.isInteger(G().style) ? G().style : 2 }; Sfx.play('soft'); break;
+    case 'g-hper': s.perWeek = Number(v); break;
+    case 'g-hoff': s.off = flip(s.off, Number(v)); break;
     case 'g-hmin': s.minutes = Number(v); break;
-    case 'g-hgoal': s.goal = v; break;
     case 'g-happly': {
       if (!s.preview) return;
       if (G().templates.length && !confirm('Replace your current split? Past workouts stay.')) return;
-      const { habit } = L.applySplit(data, s.preview, today(), now);
-      save(); gymSheet = null; Sfx.play('pop');
+      const { habit } = L.applySplit(data, Object.assign(s.preview, { style: s.style }), today(), now, k => EX.byKey(k).name);
+      save(); gymSheet = { kind: 'week', day: s.preview[0].days[0] }; Sfx.play('pop'); // straight to My week to adjust
       toast('Split saved', `Workout habit: ${habit.freq.kind === 'daily' ? 'every day' : dayList(habit.freq.days)}`);
       break;
     }
@@ -1164,13 +1174,18 @@ function gymAction(b) {
 }
 
 // typing in gym sheets updates the open draft without re-rendering (keeps focus and the keyboard)
-document.addEventListener('change', ev => { if (ev.target.dataset && ev.target.dataset.g === 'wname' && gymSheet && gymSheet.kind === 'week') setWeekDay(ev.target.value); });
+document.addEventListener('change', ev => {
+  const g = ev.target.dataset && ev.target.dataset.g;
+  if (g === 'wname' && gymSheet && gymSheet.kind === 'week') setWeekDay(ev.target.value);
+  if (g === 'hstyle' && gymSheet && gymSheet.kind === 'helper') render(); // the preview depends on the style
+});
 document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.dataset && ev.target.dataset.g === 'wname') ev.target.blur(); });
 document.addEventListener('input', ev => {
   const el = ev.target, f = el.dataset && el.dataset.g;
   if (!f || !gymSheet) return;
   const k = Number(el.dataset.k);
   if (f === 'libq') { gymSheet.q = el.value; document.getElementById('glib').innerHTML = libRows(); }
+  else if (f === 'hstyle') { gymSheet.style = Number(el.value); el.parentNode.querySelector('.ghint').textContent = styleHint(L.STYLES[gymSheet.style]); }
   else if (f === 'style') { G().style = Number(el.value); el.parentNode.querySelector('.ghint').textContent = styleHint(L.STYLES[G().style]); save(); }
   else if (f === 'wkg' || f === 'wreps') workoutInput(el, f);
 });
@@ -1287,18 +1302,28 @@ function kgChart(points) {
     ${xy.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3.5" fill="var(--accent)"/>`).join('')}</svg>
     <div class="gcl"><span>${shortDay(points[0].day)}</span><span>${lo === hi ? lo : `${lo}–${hi}`} kg</span><span>${shortDay(points[points.length - 1].day)}</span></div>`;
 }
+const MUSCLE_WORDS = { CHEST: 'chest', FRONT_DELTOIDS: 'front shoulders', BACK_DELTOIDS: 'rear shoulders', TRICEPS: 'triceps', BICEPS: 'biceps',
+  FOREARM: 'forearms', TRAPEZIUS: 'traps', UPPER_BACK: 'upper back', LOWER_BACK: 'lower back', ABS: 'abs', OBLIQUES: 'obliques', QUADRICEPS: 'quads',
+  HAMSTRING: 'hamstrings', GLUTEAL: 'glutes', ADDUCTORS: 'adductors', CALVES: 'calves', NECK: 'neck' };
 function exerciseSheet() {
-  const id = gymSheet.id, exists = G().exercises.some(e => e.id === id), hist = L.exerciseHistory(data, id), best = L.bestKg(data, id);
-  let top = null; // best set = heaviest done set, most reps at that weight
-  for (const w of G().workouts) if (w.done) for (const it of w.items) if (it.ex === id) for (const s of it.sets) {
-    if (s.done && typeof s.kg === 'number' && (!top || s.kg > top.kg || (s.kg === top.kg && s.reps > top.reps))) top = s;
+  const s = gymSheet, ex = s.id && G().exercises.find(e => e.id === s.id);
+  const entry = (ex && ex.lib && EX.byKey(ex.lib)) || (ex && EX.find(ex.name)) || (s.lib && EX.byKey(s.lib)) || null;
+  const name = ex ? ex.name : entry ? entry.name : exName(s.id), id = ex && ex.id;
+  const hist = id ? L.exerciseHistory(data, id) : [], best = id ? L.bestKg(data, id) : null;
+  let top = null; // best set = heaviest done working set, most reps at that weight
+  if (id) for (const w of G().workouts) if (w.done) for (const it of w.items) if (it.ex === id) for (const st of it.sets) {
+    if (st.done && !st.warm && typeof st.kg === 'number' && (!top || st.kg > top.kg || (st.kg === top.kg && st.reps > top.reps))) top = st;
   }
-  return gymWrap(exName(id), `
-    <div class="cards gcards"><div class="card"><b>${best === null ? '—' : best + ' kg'}</b><span>Heaviest</span></div>
+  const words = list => list.map(m => MUSCLE_WORDS[m] || m.toLowerCase()).join(', ');
+  const how = entry ? `<p class="muted gmus">${words(entry.muscles.main)}${entry.muscles.help.length ? ` · also ${words(entry.muscles.help)}` : ''}</p>
+    <div class="gmap">${EX.muscleMapSvg(entry.muscles.main, entry.muscles.help)}</div>
+    <div class="gsteps">${EX.stepsOf(entry).map((st, i) => `<figure>${EX.poseSvg(st.pose, `${name}, step ${i + 1}: ${st.cap}`)}<figcaption><b>${i + 1}</b> ${esc(st.cap)}</figcaption></figure>`).join('')}</div>` : '';
+  const video = `<a class="btn" href="https://www.youtube.com/results?search_query=${encodeURIComponent(name + ' proper form')}" target="_blank" rel="noopener">Watch video</a>`;
+  const stats = id && hist.length ? `<div class="cards gcards"><div class="card"><b>${best === null ? '—' : best + ' kg'}</b><span>Heaviest</span></div>
       <div class="card"><b>${top ? `${top.kg} × ${top.reps}` : '—'}</b><span>Best set</span></div>
-      <div class="card"><b>${hist.length}</b><span>Workouts</span></div></div>
-    ${kgChart(hist)}
-    ${exists ? '<button class="btn link" data-act="g-exdel">Delete exercise</button>' : ''}`);
+      <div class="card"><b>${hist.length}</b><span>Workouts</span></div></div>${kgChart(hist)}` : '';
+  return gymWrap(name, `${how}${video}${stats}${entry ? `<p class="muted gcredit">${EX.CREDIT}</p>` : ''}
+    ${id ? '<button class="btn link" data-act="g-exdel">Delete exercise</button>' : ''}`, 'gexsheet');
 }
 function pastAction(b) {
   const now = Date.now();
@@ -1309,7 +1334,7 @@ function pastAction(b) {
       if (!confirm('Delete this workout? This cannot be undone.')) return false;
       L.deleteGym(data, 'workouts', gymSheet.id, now); save(); gymSheet = null; Sfx.play('remove');
       return true;
-    case 'g-exo': gymSheet = { kind: 'exercise', id: b.dataset.id, from: gymSheet }; Sfx.play('soft'); return true;
+    case 'g-exo': gymSheet = { kind: 'exercise', id: b.dataset.id, lib: b.dataset.lib, from: gymSheet }; Sfx.play('soft'); return true;
     case 'g-exdel':
       if (!confirm(`Delete ${exName(gymSheet.id)}? It leaves your split; past workouts keep their sets.`)) return false;
       L.deleteGym(data, 'exercises', gymSheet.id, now); save(); gymSheet = null; Sfx.play('remove');
