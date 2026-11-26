@@ -477,6 +477,7 @@
   .glr { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); }
   .glr span { flex: 1; } .glr .gs { padding: 6px 14px; }
   .gi { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); background: none; color: var(--muted); font: italic 700 .9rem Georgia, serif; }
+  .gsheet input[data-g=wname], .gsheet input[data-g=libq] { width: 100%; box-sizing: border-box; }
   /* Android app draws edge to edge: Capacitor 8 sets --safe-area-inset-* (falls back to env()) */
   html.native { --sat: var(--safe-area-inset-top, env(safe-area-inset-top, 0px)); --sab: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)); }
   html.native main { padding-top: calc(16px + var(--sat)); padding-bottom: calc(88px + var(--sab)); }
@@ -1139,6 +1140,98 @@ function gymAction(b) {
       t.updated = now; save();
       break;
     }
+    case 'g-wadd': {
+      const t = G().templates.find(x => x.days.includes(s.day));
+      if (t) gymSheet = { kind: 'library', target: { kind: 'tpl', id: t.id }, q: '', group: null, from: s };
+      break;
+    }
+    case 'g-wrest': setWeekDay(''); return;
+    case 'g-lgroup': s.group = v === 'All' ? null : v; break;
+    case 'g-libadd': case 'g-libcustom': {
+      const lib = b.dataset.lib, name = b.dataset.act === 'g-libcustom' ? (s.q || '').trim() : lib ? EX.byKey(lib).name : '';
+      const exId = b.dataset.id || (name && L.ensureExercise(data, name, now, lib));
+      if (!exId) return;
+      addExerciseTo(s.target, exId, now); save(); gymSheet = s.from; Sfx.play('pop');
+      break;
+    }
+    default: {
+      const r = workoutAction(b);
+      if (r === false) return;
+      if (r === null && pastAction(b) === false) return;
+    }
+  }
+  render();
+}
+
+// typing in gym sheets updates the open draft without re-rendering (keeps focus and the keyboard)
+document.addEventListener('change', ev => { if (ev.target.dataset && ev.target.dataset.g === 'wname' && gymSheet && gymSheet.kind === 'week') setWeekDay(ev.target.value); });
+document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.dataset && ev.target.dataset.g === 'wname') ev.target.blur(); });
+document.addEventListener('input', ev => {
+  const el = ev.target, f = el.dataset && el.dataset.g;
+  if (!f || !gymSheet) return;
+  const k = Number(el.dataset.k);
+  if (f === 'libq') { gymSheet.q = el.value; document.getElementById('glib').innerHTML = libRows(); }
+  else if (f === 'style') { G().style = Number(el.value); el.parentNode.querySelector('.ghint').textContent = styleHint(L.STYLES[G().style]); save(); }
+  else if (f === 'wkg' || f === 'wreps') workoutInput(el, f);
+});
+
+// workout screen: set rows prefilled from last time (greyed until done), saved on every change
+const fmtSets = sets => sets.map(s => (typeof s.kg === 'number' ? `${s.kg} × ` : '') + s.reps).join(', ');
+function workoutSheet() {
+  const g = G(), w = g.workouts.find(x => x.id === gymSheet.id);
+  if (!w) { gymSheet = null; return ''; }
+  const tpl = g.templates.find(t => t.id === w.tpl);
+  return gymWrap(`${tpl ? tpl.name : 'Workout'} · ${label(w.day)}`, `
+    ${w.items.map((it, a) => {
+      const last = L.lastSets(data, it.ex, w.id), best = L.bestKg(data, it.ex, w.id);
+      return `<div class="gex"><div class="gexh"><button class="gexn" data-act="g-exo" data-id="${it.ex}">${esc(exName(it.ex))}</button>
+        <button class="gx" data-act="g-wexdel" data-a="${a}" aria-label="Remove ${esc(exName(it.ex))}">×</button></div>
+        <p class="muted gmeta">${[last && last.length ? 'last: ' + fmtSets(last) : '', best !== null ? `best ${best} kg` : ''].filter(Boolean).join(' · ') || 'First time'}</p>
+        ${it.sets.map((s, k) => `<div class="gset${s.done ? ' done' : ''}"><span>${k + 1}</span>
+          <input data-g="wkg" data-a="${a}" data-k="${k}" inputmode="decimal" placeholder="kg" value="${typeof s.kg === 'number' ? s.kg : ''}" aria-label="Set ${k + 1} kg">
+          <input data-g="wreps" data-a="${a}" data-k="${k}" inputmode="numeric" value="${s.reps}" aria-label="Set ${k + 1} reps">
+          <button class="gck" data-act="g-set" data-a="${a}" data-k="${k}" aria-label="Set ${k + 1} done" aria-pressed="${s.done}">${CHECK}</button></div>`).join('')}
+        <button class="btn link gaddset" data-act="g-addset" data-a="${a}">+ Add set</button></div>`;
+    }).join('')}
+    <button class="btn" data-act="g-wlib">+ Add exercise</button>
+    <button class="btn primary" data-act="g-finish">${w.done ? 'Save' : 'Finish'}</button>
+    ${w.done ? '' : '<button class="btn link" data-act="g-discard">Discard workout</button>'}`, 'gwork');
+}
+function recordCard({ name, kg }) {
+  return `<div class="cel-card record">
+    <div class="cel-rays"></div>
+    <div class="cel-num"><b>${kg}</b><span>kg</span></div>
+    <div class="cel-title">New best</div>
+    <div class="cel-sub">${esc(name)}</div>
+    <button class="btn primary" data-act="celclose">Keep lifting</button>
+  </div>`;
+}
+// returns false when nothing changed (no re-render)
+function workoutAction(b) {
+  const w = gymSheet && G().workouts.find(x => x.id === gymSheet.id), a = Number(b.dataset.a), k = Number(b.dataset.k), now = Date.now();
+  switch (b.dataset.act) {
+    case 'g-start': {
+      const nw = L.startWorkout(data, today(), b.dataset.id || null, now);
+      save(); gymSheet = { kind: 'workout', id: nw.id }; Sfx.play('soft');
+      return true;
+    }
+    case 'g-set': {
+      const s = w.items[a].sets[k];
+      s.done = !s.done; w.updated = now; save();
+      if (s.done) { Sfx.play('tick', w.items.reduce((n, i) => n + i.sets.filter(x => x.done).length, 0)); if (navigator.vibrate) navigator.vibrate(8); }
+      else Sfx.play('untick');
+      return true;
+    }
+    case 'g-addset': {
+      const sets = w.items[a].sets, last = sets[sets.length - 1];
+      sets.push(last ? { ...last, done: false } : { reps: 8, done: false });
+      w.updated = now; save();
+      return true;
+    }
+    case 'g-wexdel':
+      if (w.items[a].sets.some(s => s.done) && !confirm(`Remove ${exName(w.items[a].ex)} and its sets from this workout?`)) return false;
+      w.items.splice(a, 1); w.updated = now; save();
+      return true;
     case 'g-wlib':
       gymSheet = { kind: 'library', target: { kind: 'workout', id: w.id }, q: '', group: null, from: gymSheet };
       return true;
