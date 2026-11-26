@@ -529,4 +529,29 @@ assert.notStrictEqual(L.newId(), L.newId());
   g.gym.style = 2; g.gym.workouts[0].items[0].sets[0].warm = 'yes'; assert.ok(!L.validate(g));
 }
 
+// --- exercise library (exercises.js) ---
+{
+  const EX = require('./exercises.js');
+  const keys = EX.LIST.map(e => e.key);
+  assert.strictEqual(new Set(keys).size, keys.length);
+  assert.ok(keys.length >= 35);
+  for (const k of Object.values(L.SPLIT_KEYS).flatMap(t => [...t.compound, ...t.isolation])) assert.ok(EX.byKey(k), 'missing library key ' + k);
+  const valid = new Set(['CHEST', 'OBLIQUES', 'ABS', 'BICEPS', 'TRICEPS', 'NECK', 'FRONT_DELTOIDS', 'ADDUCTORS', 'QUADRICEPS', 'CALVES', 'FOREARM',
+    'TRAPEZIUS', 'BACK_DELTOIDS', 'UPPER_BACK', 'LOWER_BACK', 'GLUTEAL', 'HAMSTRING']);
+  for (const e of EX.LIST) {
+    assert.ok(['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core'].includes(e.group), e.key);
+    assert.ok(e.muscles.main.length && [...e.muscles.main, ...e.muscles.help].every(m => valid.has(m)), e.key);
+    const st = EX.stepsOf(e);
+    assert.strictEqual(st.length, 3, e.key);
+    assert.ok(st.every(s => s.cap && s.cap.length <= 60 && Array.isArray(s.pose.parts) && s.pose.parts.length), e.key);
+  }
+  assert.strictEqual(EX.find('bench PRESS').key, 'bench-press');
+  assert.strictEqual(EX.find('nope'), null);
+  const map = EX.muscleMapSvg(['CHEST'], ['TRICEPS']);
+  assert.ok(map.includes('#E24B4A') && map.includes('#F09595') && map.split('<svg').length === 3);
+  const svg = EX.poseSvg(EX.stepsOf(EX.byKey('squat'))[0].pose, 'x');
+  assert.ok(svg.startsWith('<svg') && svg.includes('#E24B4A'));
+  assert.ok(/MIT/.test(EX.CREDIT));
+}
+
 console.log('all tests passed');
