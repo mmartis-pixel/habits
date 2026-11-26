@@ -485,6 +485,11 @@
   .gsteps figcaption { font-size: .75rem; color: var(--muted); margin-top: 4px; line-height: 1.3; } .gsteps figcaption b { color: var(--text); }
   .gexsheet a.btn { display: block; text-align: center; text-decoration: none; }
   .gcredit { font-size: .7rem; margin-top: 10px; }
+  .gwhint { margin: 0 0 6px; color: var(--accent); }
+  .gwarm { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 6px; padding: 4px 10px 4px 6px; border-radius: 999px; border: 1px solid var(--line); background: none; color: var(--muted); font-size: .8rem; font-weight: 600; }
+  .gwarm svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; opacity: .35; }
+  .gwarm.on { border-color: var(--accent); color: var(--accent); } .gwarm.on svg { opacity: 1; }
+  .gset.warm span { color: var(--accent); font-weight: 700; }
   /* Android app draws edge to edge: Capacitor 8 sets --safe-area-inset-* (falls back to env()) */
   html.native { --sat: var(--safe-area-inset-top, env(safe-area-inset-top, 0px)); --sab: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)); }
   html.native main { padding-top: calc(16px + var(--sat)); padding-bottom: calc(88px + var(--sab)); }
@@ -1008,7 +1013,7 @@ const styleHint = st => `${st.reps} reps · ${st.rest} rest · ${st.sets} workin
 const G = () => L.gymOf(data);
 const exName = id => (G().exercises.find(e => e.id === id) || {}).name || 'Deleted exercise';
 const dayList = days => days.length ? [...days].sort((x, y) => x - y).map(d => WD[d]).join(' · ') : 'Any day';
-const doneSets = w => w.items.reduce((n, i) => n + i.sets.filter(s => s.done).length, 0);
+const doneSets = w => w.items.reduce((n, i) => n + i.sets.filter(s => s.done && !s.warm).length, 0); // warm-ups don't count
 const gymWrap = (title, body, cls = '') => `<div class="backdrop" data-act="g-close"></div>
   <div class="sheet gsheet ${cls}" role="dialog" aria-modal="true" aria-label="${esc(title)}">
     <div class="hs-head"><div><h3>${esc(title)}</h3></div><button class="x" data-act="g-close" aria-label="Close">×</button></div>${body}</div>`;
@@ -1191,20 +1196,23 @@ document.addEventListener('input', ev => {
 });
 
 // workout screen: set rows prefilled from last time (greyed until done), saved on every change
-const fmtSets = sets => sets.map(s => (typeof s.kg === 'number' ? `${s.kg} × ` : '') + s.reps).join(', ');
+const fmtSets = sets => sets.map(s => (s.warm ? 'W ' : '') + (typeof s.kg === 'number' ? `${s.kg} × ` : '') + s.reps).join(', ');
 function workoutSheet() {
   const g = G(), w = g.workouts.find(x => x.id === gymSheet.id);
   if (!w) { gymSheet = null; return ''; }
   const tpl = g.templates.find(t => t.id === w.tpl);
   return gymWrap(`${tpl ? tpl.name : 'Workout'} · ${label(w.day)}`, `
+    <p class="ghint gwhint">${styleHint(L.styleOf(data))}</p>
     ${w.items.map((it, a) => {
-      const last = L.lastSets(data, it.ex, w.id), best = L.bestKg(data, it.ex, w.id);
+      const last = L.lastSets(data, it.ex, w.id), best = L.bestKg(data, it.ex, w.id), warm = it.sets.some(s => s.warm);
+      let n = 0; // working-set number (warm-ups show W)
       return `<div class="gex"><div class="gexh"><button class="gexn" data-act="g-exo" data-id="${it.ex}">${esc(exName(it.ex))}</button>
         <button class="gx" data-act="g-wexdel" data-a="${a}" aria-label="Remove ${esc(exName(it.ex))}">×</button></div>
         <p class="muted gmeta">${[last && last.length ? 'last: ' + fmtSets(last) : '', best !== null ? `best ${best} kg` : ''].filter(Boolean).join(' · ') || 'First time'}</p>
-        ${it.sets.map((s, k) => `<div class="gset${s.done ? ' done' : ''}"><span>${k + 1}</span>
+        <button class="gwarm${warm ? ' on' : ''}" data-act="g-warm" data-a="${a}" aria-pressed="${warm}">${CHECK}Warm-up</button>
+        ${it.sets.map((s, k) => `<div class="gset${s.done ? ' done' : ''}${s.warm ? ' warm' : ''}"><span>${s.warm ? 'W' : ++n}</span>
           <input data-g="wkg" data-a="${a}" data-k="${k}" inputmode="decimal" placeholder="kg" value="${typeof s.kg === 'number' ? s.kg : ''}" aria-label="Set ${k + 1} kg">
-          <input data-g="wreps" data-a="${a}" data-k="${k}" inputmode="numeric" value="${s.reps}" aria-label="Set ${k + 1} reps">
+          <input data-g="wreps" data-a="${a}" data-k="${k}" inputmode="numeric" placeholder="reps" value="${s.reps || s.done ? s.reps : ''}" aria-label="Set ${k + 1} reps">
           <button class="gck" data-act="g-set" data-a="${a}" data-k="${k}" aria-label="Set ${k + 1} done" aria-pressed="${s.done}">${CHECK}</button></div>`).join('')}
         <button class="btn link gaddset" data-act="g-addset" data-a="${a}">+ Add set</button></div>`;
     }).join('')}
@@ -1232,14 +1240,28 @@ function workoutAction(b) {
     }
     case 'g-set': {
       const s = w.items[a].sets[k];
+      if (!s.done && !s.reps) { toast('Enter reps first'); return false; }
       s.done = !s.done; w.updated = now; save();
       if (s.done) { Sfx.play('tick', w.items.reduce((n, i) => n + i.sets.filter(x => x.done).length, 0)); if (navigator.vibrate) navigator.vibrate(8); }
       else Sfx.play('untick');
       return true;
     }
+    case 'g-warm': { // on: a W row on top, prefilled from the last warm-up; off: warm rows go
+      const it = w.items[a];
+      if (it.sets.some(s => s.warm)) it.sets = it.sets.filter(s => !s.warm);
+      else {
+        const lw = (L.lastSets(data, it.ex, w.id) || []).find(s => s.warm), row = { reps: lw ? lw.reps : 0, done: false, warm: true };
+        if (lw && typeof lw.kg === 'number') row.kg = lw.kg;
+        it.sets.unshift(row);
+      }
+      w.updated = now; save();
+      return true;
+    }
     case 'g-addset': {
-      const sets = w.items[a].sets, last = sets[sets.length - 1];
-      sets.push(last ? { ...last, done: false } : { reps: 8, done: false });
+      const sets = w.items[a].sets, last = [...sets].reverse().find(s => !s.warm);
+      const row = { reps: last ? last.reps : 0, done: false };
+      if (last && typeof last.kg === 'number') row.kg = last.kg;
+      sets.push(row);
       w.updated = now; save();
       return true;
     }
