@@ -374,39 +374,44 @@ assert.notStrictEqual(L.newId(), L.newId());
   assert.deepStrictEqual(L.gymOf(data([])), { exercises: [], templates: [], workouts: [] });
 }
 
-// --- gym: split helper ---
+// --- gym: split helper (v2: times a week, days off, training style; library keys, no reps) ---
 {
-  let s = L.suggestSplit({ days: [4, 0, 2], minutes: 60, goal: 'muscle' });
+  const keys = t => t.items.map(i => i.lib);
+  let s = L.suggestSplit({ perWeek: 3, daysOff: [5, 6], minutes: 60, style: 2 });
   assert.deepStrictEqual(s.map(t => t.name), ['Push', 'Pull', 'Legs']);
   assert.deepStrictEqual(s.map(t => t.days), [[0], [2], [4]]);
-  assert.ok(s.every(t => t.items.length === 5 && t.items.every(i => i.sets === 3 && i.reps === '8-12')));
-  assert.strictEqual(s[0].items[0].name, 'Bench press');
-  s = L.suggestSplit({ days: [0, 1, 3, 4], minutes: 60, goal: 'muscle' });
+  assert.ok(s.every(t => t.items.length === 5 && t.items.every(i => Object.keys(i).join() === 'lib')));
+  assert.deepStrictEqual(keys(s[0]).slice(0, 3), ['bench-press', 'overhead-press', 'lateral-raise']);
+  s = L.suggestSplit({ perWeek: 3, daysOff: [0], minutes: 60, style: 2 });
+  assert.deepStrictEqual(s.flatMap(t => t.days).sort(), [1, 2, 4]);                        // Monday off → Tue/Wed/Fri
+  s = L.suggestSplit({ perWeek: 3, minutes: 60, style: 0 });
+  assert.ok(s.every(t => t.items.length === 3));
+  assert.deepStrictEqual(keys(s[0]), ['bench-press', 'overhead-press', 'incline-dumbbell-press']);
+  assert.strictEqual(L.suggestSplit({ perWeek: 3, minutes: 60, style: 4 })[0].items.length, 6);
+  assert.deepStrictEqual(L.suggestSplit({ perWeek: 6, daysOff: [0, 1], minutes: 60, style: 2 }), []);
+  s = L.suggestSplit({ perWeek: 4, minutes: 60, style: 2 });
   assert.deepStrictEqual(s.map(t => [t.name, t.days]), [['Upper', [0, 3]], ['Lower', [1, 4]]]);
-  s = L.suggestSplit({ days: [1, 3], minutes: 45, goal: 'muscle' });
-  assert.deepStrictEqual(s[0].items.map(i => i.name), ['Squat', 'Bench press', 'Barbell row', 'Overhead press']);
-  assert.strictEqual(s[1].name, 'Full body B');
-  assert.strictEqual(s[1].items[0].name, 'Overhead press');
-  s = L.suggestSplit({ days: [0, 2, 4], minutes: 90, goal: 'strength' });
-  assert.strictEqual(s[0].items.length, 7);
-  assert.deepStrictEqual([s[0].items[0], s[0].items[1], s[0].items[2]].map(i => [i.sets, i.reps]), [[4, '4-6'], [4, '4-6'], [3, '8-10']]);
-  assert.ok(Object.values(L.GYM_LIBRARY).every(list => list.length === 7));
+  s = L.suggestSplit({ perWeek: 2, minutes: 45, style: 2 });
+  assert.deepStrictEqual(s.map(t => [t.name, t.days]), [['Full body A', [0]], ['Full body B', [3]]]);
+  assert.strictEqual(s[1].items[0].lib, 'overhead-press');                                // B starts 3 compounds later
 
-  // apply: links the existing "workout" habit, sets its days, creates templates
+  // apply: names from a lookup, links the existing "workout" habit, sets its days and the style
+  const names = { 'bench-press': 'Bench press' }, nameOf = k => names[k] || k;
   const d = data([{ ...daily(), id: 'h1', name: 'workout' }]);
-  let r = L.applySplit(d, L.suggestSplit({ days: [0, 2, 4], minutes: 60, goal: 'muscle' }), T, 50);
+  let r = L.applySplit(d, Object.assign(L.suggestSplit({ perWeek: 3, minutes: 60, style: 2 }), { style: 1 }), T, 50, nameOf);
   assert.strictEqual(r.habit.id, 'h1');
   assert.deepStrictEqual(d.habits[0].freq, { kind: 'days', days: [0, 2, 4] });
-  assert.strictEqual(d.gym.habitId, 'h1');
+  assert.strictEqual(d.gym.style, 1);
   assert.strictEqual(d.gym.templates.length, 3);
+  const bench = d.gym.exercises.find(e => e.lib === 'bench-press');
+  assert.strictEqual(bench.name, 'Bench press');
   const firstTpl = d.gym.templates.map(t => t.id);
-  L.applySplit(d, L.suggestSplit({ days: [0, 2, 4], minutes: 60, goal: 'muscle' }), T, 60);
-  assert.strictEqual(d.gym.exercises.filter(e => e.name === 'Bench press').length, 1);
+  L.applySplit(d, L.suggestSplit({ perWeek: 3, minutes: 60, style: 2 }), T, 60, nameOf);
+  assert.strictEqual(d.gym.exercises.filter(e => e.lib === 'bench-press').length, 1);
   assert.ok(firstTpl.every(id => d.deleted[id]));
   assert.ok(d.gym.templates.every(t => t.items.every(i => d.gym.exercises.some(e => e.id === i.ex))));
-  // no workout habit: one is created
   const e = data([daily()]);
-  r = L.applySplit(e, L.suggestSplit({ days: [0, 1, 2, 3, 4, 5, 6].slice(0, 6), minutes: 45, goal: 'muscle' }), T, 70);
+  r = L.applySplit(e, L.suggestSplit({ perWeek: 6, minutes: 45, style: 2 }), T, 70);
   assert.strictEqual(r.habit.name, 'Workout');
   assert.strictEqual(r.habit.created, T);
   assert.ok(e.habits.includes(r.habit) && L.validate(e));
@@ -421,7 +426,7 @@ assert.notStrictEqual(L.newId(), L.newId());
   assert.strictEqual(L.todayTemplate(d, T).id, 't1');                  // T is a Thursday
   assert.strictEqual(L.todayTemplate(d, '2026-11-20'), null);
   const w1 = L.startWorkout(d, T, 't1', 10);
-  assert.deepStrictEqual(w1.items[0].sets, [{ reps: 8, done: false }, { reps: 8, done: false }, { reps: 8, done: false }]);
+  assert.deepStrictEqual(w1.items[0].sets, [{ reps: 0, done: false }, { reps: 0, done: false }]); // v20 item sets:3/reps ignored; Balanced = 2 empty rows
   assert.strictEqual(L.startWorkout(d, T, 't1', 11).id, w1.id);          // a draft is continued, not duplicated
   w1.items[0].sets = [{ kg: 80, reps: 8, done: true }, { kg: 82.5, reps: 8, done: true }, { kg: 82.5, reps: 7, done: true }];
   assert.deepStrictEqual(L.finishWorkout(d, w1.id, 20).records, []);   // first time ever: no record
@@ -472,6 +477,56 @@ assert.notStrictEqual(L.newId(), L.newId());
   L.gymOf(e).templates.push({ id: 't2', name: 'Any', days: [], items: [], updated: 1 });
   assert.strictEqual(L.linkWorkoutHabit(e, T, 9), null);                     // nothing planned, no habit yet: none created
   assert.strictEqual(e.habits.length, 1);
+}
+
+// --- gym v2: training style, my week, warm-ups ---
+{
+  assert.strictEqual(L.styleOf(data([])).label, 'Balanced');
+  assert.strictEqual(L.styleOf(data([])).firstRows, 2);
+  assert.deepStrictEqual(L.STYLES.map(s => s.reps), ['4–8', '5–9', '6–10', '7–11', '8–12']);
+
+  // my week: one workout per day, shared by name, copy on a new name, rename when used only here
+  const d = data([daily()]);
+  const up = L.setDayWorkout(d, 0, 'Upper', 1);
+  L.gymOf(d);
+  up.items.push({ ex: L.ensureExercise(d, 'Bench press', 1, 'bench-press') });
+  const low = L.setDayWorkout(d, 2, 'Lower', 2);
+  assert.notStrictEqual(low.id, up.id);
+  assert.strictEqual(L.setDayWorkout(d, 4, 'upper', 3).id, up.id);
+  assert.deepStrictEqual(up.days, [0, 4]);
+  const upB = L.setDayWorkout(d, 4, 'Upper B', 4);                       // shared → copy, Monday keeps Upper
+  assert.notStrictEqual(upB.id, up.id);
+  assert.deepStrictEqual(upB.items, up.items);
+  assert.deepStrictEqual(up.days, [0]);
+  assert.strictEqual(L.setDayWorkout(d, 2, '', 5), null);                // rest day
+  assert.deepStrictEqual(low.days, []);
+  const ren = L.setDayWorkout(d, 0, 'Push', 6);                         // Upper only on Monday → renamed
+  assert.strictEqual(ren.id, up.id);
+  assert.strictEqual(up.name, 'Push');
+  assert.ok(d.gym.templates.every(t => t.days.filter(x => x === 0).length <= 1));
+  const wh = d.habits.find(h => h.id === d.gym.habitId);                    // my week created the Workout habit
+  assert.ok(wh && /^\d{4}-\d{2}-\d{2}$/.test(wh.created) && L.validate(d));
+  assert.strictEqual(L.ensureExercise(d, 'BENCH press', 7), up.items[0].ex);  // name match
+  assert.strictEqual(L.ensureExercise(d, 'Flat bench', 8, 'bench-press'), up.items[0].ex); // lib match wins
+
+  // warm-ups never count; prefill keeps them; first time = the style's working rows
+  const g = Object.assign(data([daily()]), { gym: { habitId: 'd', exercises: [{ id: 'e1', name: 'Bench press', updated: 1 }],
+    templates: [{ id: 't1', name: 'Push', days: [3], items: [{ ex: 'e1' }], updated: 1 }], workouts: [] } });
+  const w1 = L.startWorkout(g, T, 't1', 10);
+  assert.deepStrictEqual(w1.items[0].sets, [{ reps: 0, done: false }, { reps: 0, done: false }]);
+  w1.items[0].sets = [{ kg: 120, reps: 5, done: true, warm: true }, { kg: 80, reps: 8, done: true }, { kg: 80, reps: 8, done: true }];
+  L.finishWorkout(g, w1.id, 20);
+  assert.strictEqual(L.bestKg(g, 'e1'), 80);
+  assert.deepStrictEqual(L.exerciseHistory(g, 'e1'), [{ day: T, kg: 80 }]);
+  const w2 = L.startWorkout(g, '2026-11-26', 't1', 30);
+  assert.strictEqual(w2.items[0].sets.length, 3);
+  assert.deepStrictEqual(w2.items[0].sets[0], { kg: 120, reps: 5, done: false, warm: true });
+  w2.items[0].sets = [{ kg: 200, reps: 1, done: true, warm: true }, { kg: 85, reps: 6, done: true }];
+  assert.deepStrictEqual(L.finishWorkout(g, w2.id, 40).records, [{ ex: 'e1', kg: 85 }]);
+  assert.ok(L.validate(g));
+  g.gym.style = 4; assert.ok(L.validate(g));
+  g.gym.style = 9; assert.ok(!L.validate(g));
+  g.gym.style = 2; g.gym.workouts[0].items[0].sets[0].warm = 'yes'; assert.ok(!L.validate(g));
 }
 
 console.log('all tests passed');

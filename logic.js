@@ -117,50 +117,97 @@
     (data.deleted = data.deleted || {})[id] = now;
   }
 
-  // ---- split helper: proven splits by training days, no AI. Compound lifts first in every list. ----
-  const GYM_LIBRARY = {
-    push: ['Bench press', 'Overhead press', 'Incline dumbbell press', 'Dips', 'Lateral raise', 'Triceps pushdown', 'Cable fly'],
-    pull: ['Deadlift', 'Pull-up', 'Barbell row', 'Lat pulldown', 'Seated cable row', 'Face pull', 'Biceps curl'],
-    legs: ['Squat', 'Romanian deadlift', 'Leg press', 'Walking lunge', 'Leg curl', 'Leg extension', 'Calf raise'],
-    upper: ['Bench press', 'Barbell row', 'Overhead press', 'Pull-up', 'Incline dumbbell press', 'Lateral raise', 'Biceps curl'],
-    lower: ['Squat', 'Romanian deadlift', 'Leg press', 'Leg curl', 'Walking lunge', 'Leg extension', 'Calf raise'],
-    full: ['Squat', 'Bench press', 'Barbell row', 'Overhead press', 'Romanian deadlift', 'Pull-up', 'Plank'],
+  // ---- training style: the user's own scale from strength to hypertrophy (Balanced = where most people train) ----
+  const STYLES = [
+    { label: 'Strength', reps: '4–8', rest: '5 min', sets: '3', restMin: 5, setsN: 3, firstRows: 3 },
+    { label: '', reps: '5–9', rest: '4 min', sets: '3', restMin: 4, setsN: 3, firstRows: 3 },
+    { label: 'Balanced', reps: '6–10', rest: '3 min', sets: '2', restMin: 3, setsN: 2, firstRows: 2 },
+    { label: '', reps: '7–11', rest: '2–3 min', sets: '2', restMin: 2.5, setsN: 2, firstRows: 2 },
+    { label: 'Hypertrophy', reps: '8–12', rest: '2–3 min', sets: '1–2', restMin: 2.5, setsN: 2, firstRows: 2 },
+  ];
+  const styleOf = data => STYLES[data.gym && Number.isInteger(data.gym.style) ? data.gym.style : 2];
+
+  // ---- split helper: proven splits, no AI, no reps. Library keys (exercises.js has names and pictures). ----
+  const SPLIT_KEYS = {
+    push: { compound: ['bench-press', 'overhead-press', 'incline-dumbbell-press', 'dips'], isolation: ['lateral-raise', 'triceps-pushdown', 'cable-fly', 'overhead-triceps-extension'] },
+    pull: { compound: ['deadlift', 'pull-up', 'barbell-row', 'lat-pulldown', 'seated-cable-row'], isolation: ['face-pull', 'biceps-curl', 'hammer-curl', 'rear-delt-fly'] },
+    legs: { compound: ['squat', 'romanian-deadlift', 'leg-press', 'walking-lunge', 'hip-thrust'], isolation: ['leg-curl', 'leg-extension', 'calf-raise', 'hanging-leg-raise'] },
+    upper: { compound: ['bench-press', 'barbell-row', 'overhead-press', 'pull-up', 'incline-dumbbell-press'], isolation: ['lateral-raise', 'biceps-curl', 'triceps-pushdown', 'face-pull'] },
+    lower: { compound: ['squat', 'romanian-deadlift', 'leg-press', 'walking-lunge', 'hip-thrust'], isolation: ['leg-curl', 'leg-extension', 'calf-raise', 'plank'] },
+    full: { compound: ['squat', 'bench-press', 'barbell-row', 'overhead-press', 'romanian-deadlift', 'pull-up'], isolation: ['lateral-raise', 'biceps-curl', 'triceps-pushdown', 'plank'] },
   };
   const SPLITS = { 2: ['Full body A', 'Full body B'], 3: ['Push', 'Pull', 'Legs'], 4: ['Upper', 'Lower', 'Upper', 'Lower'],
     5: ['Push', 'Pull', 'Legs', 'Upper', 'Lower'], 6: ['Push', 'Pull', 'Legs', 'Push', 'Pull', 'Legs'] };
-  const SPLIT_LIB = { 'Full body A': ['full', 0], 'Full body B': ['full', 3], Push: ['push', 0], Pull: ['pull', 0], Legs: ['legs', 0], Upper: ['upper', 0], Lower: ['lower', 0] };
-  // days: weekdays 0..6 (2–6 of them) → [{ name, days, items: [{ name, sets, reps }] }]; same name = one template on several days
-  function suggestSplit({ days, minutes, goal }) {
-    const ds = [...days].sort((x, y) => x - y), seq = SPLITS[ds.length] || [];
-    const n = { 45: 4, 60: 5, 90: 7 }[minutes] || 5, out = [];
+  const SPLIT_TYPE = { 'Full body A': 'full', 'Full body B': 'full', Push: 'push', Pull: 'pull', Legs: 'legs', Upper: 'upper', Lower: 'lower' };
+  const PREF_DAYS = { 2: [0, 3], 3: [0, 2, 4], 4: [0, 1, 3, 4], 5: [0, 1, 2, 3, 4], 6: [0, 1, 2, 3, 4, 5] };
+  // preferred weekdays; a day off moves to the nearest free unused day (later first). [] = not enough free days
+  function pickDays(perWeek, daysOff) {
+    const free = [0, 1, 2, 3, 4, 5, 6].filter(d => !daysOff.includes(d)), out = [];
+    if (!PREF_DAYS[perWeek] || free.length < perWeek) return [];
+    for (const d of PREF_DAYS[perWeek]) {
+      if (free.includes(d) && !out.includes(d)) { out.push(d); continue; }
+      for (let k = 1; k <= 6; k++) {
+        const c = [d + k, d - k].find(x => x >= 0 && x <= 6 && free.includes(x) && !out.includes(x));
+        if (c !== undefined) { out.push(c); break; }
+      }
+    }
+    return out.sort((x, y) => x - y);
+  }
+  // → [{ name, days, items: [{ lib }] }]; exercise count from session length and the style's sets × rest
+  function suggestSplit({ perWeek, daysOff = [], minutes, style = 2 }) {
+    const days = pickDays(perWeek, daysOff), seq = SPLITS[perWeek];
+    if (days.length !== perWeek || !seq) return [];
+    const st = STYLES[style] || STYLES[2], per = 2 + st.setsN * (st.restMin + 1);
+    const n = Math.max(3, Math.min(8, Math.floor((minutes - 5) / per))), out = [];
     seq.forEach((name, i) => {
       let t = out.find(x => x.name === name);
       if (!t) {
-        const [lib, start] = SPLIT_LIB[name], list = GYM_LIBRARY[lib];
-        t = { name, days: [], items: Array.from({ length: n }, (_, j) => {
-          const heavy = goal === 'strength' && j < 2;
-          return { name: list[(start + j) % list.length], sets: heavy ? 4 : 3, reps: heavy ? '4-6' : goal === 'strength' ? '8-10' : '8-12' };
-        }) };
+        const k = SPLIT_KEYS[SPLIT_TYPE[name]];
+        const comp = name === 'Full body B' ? [...k.compound.slice(3), ...k.compound.slice(0, 3)] : k.compound;
+        const order = style <= 1 ? [...comp, ...k.isolation] : [...comp.slice(0, 2), ...k.isolation, ...comp.slice(2)];
+        t = { name, days: [], items: order.slice(0, n).map(lib => ({ lib })) };
         out.push(t);
       }
-      t.days.push(ds[i]);
+      t.days.push(days[i]);
     });
     return out;
   }
-  // replace the split, reuse exercises by name, link (or create) the Workout habit and give it the split's days
-  function applySplit(data, split, today, now = Date.now()) {
+  // replace the split; exercises by library key (names via nameOf), link the Workout habit, keep the chosen style
+  function applySplit(data, split, today, now = Date.now(), nameOf = k => k) {
     const g = gymOf(data);
     for (const t of [...g.templates]) deleteGym(data, 'templates', t.id, now);
     for (const t of split) g.templates.push({ id: newId(), name: t.name, days: [...t.days],
-      items: t.items.map(i => ({ ex: ensureExercise(data, i.name, now), sets: i.sets, reps: i.reps })), updated: now });
+      items: t.items.map(i => ({ ex: ensureExercise(data, nameOf(i.lib), now, i.lib) })), updated: now });
+    if (Number.isInteger(split.style)) g.style = split.style;
     return { habit: linkWorkoutHabit(data, today, now) };
   }
-  // exercise id by name (any case); a new name creates the exercise
-  function ensureExercise(data, name, now = Date.now()) {
+  // exercise id: library key first, then name (any case); a new name creates the exercise
+  function ensureExercise(data, name, now = Date.now(), lib) {
     const g = gymOf(data), n = name.trim();
-    let e = g.exercises.find(x => x.name.toLowerCase() === n.toLowerCase());
-    if (!e) { e = { id: newId(), name: n, updated: now }; g.exercises.push(e); }
+    let e = (lib && g.exercises.find(x => x.lib === lib)) || g.exercises.find(x => x.name.toLowerCase() === n.toLowerCase());
+    if (!e) { e = { id: newId(), name: n, updated: now }; if (lib) e.lib = lib; g.exercises.push(e); }
+    else if (lib && !e.lib) { e.lib = lib; e.updated = now; }
     return e.id;
+  }
+  // my week: one workout per day. '' = rest day; an existing name is assigned (shared exercises);
+  // a workout used only on this day is renamed; otherwise a new one copies this day's exercises
+  function setDayWorkout(data, day, name, now = Date.now()) {
+    const g = gymOf(data), n = (name || '').trim();
+    const cur = g.templates.find(t => t.days.includes(day));
+    const off = t => { if (t.days.includes(day)) { t.days = t.days.filter(x => x !== day); t.updated = now; } };
+    let tpl = null;
+    if (!n) g.templates.forEach(off);
+    else if ((tpl = g.templates.find(t => t.name.trim().toLowerCase() === n.toLowerCase()))) {
+      g.templates.filter(t => t !== tpl).forEach(off);
+      if (!tpl.days.includes(day)) { tpl.days = [...tpl.days, day].sort((x, y) => x - y); tpl.updated = now; }
+    } else if (cur && cur.days.length === 1) { tpl = cur; tpl.name = n; tpl.updated = now; }
+    else {
+      if (cur) off(cur);
+      tpl = { id: newId(), name: n, days: [day], items: cur ? cur.items.map(i => ({ ex: i.ex })) : [], updated: now };
+      g.templates.push(tpl);
+    }
+    linkWorkoutHabit(data, dayKey(new Date(now)), now); // a new Workout habit starts today
+    return tpl;
   }
   // link the Workout habit (linked one → one named "Workout" → new) and give it the days of the whole split.
   // With no planned days it only links an existing habit and leaves its days alone; returns the habit or null.
@@ -182,7 +229,7 @@
   // ---- workouts: one unfinished draft at a time; sets prefilled from the last time ----
   const finishedWorkouts = (g, excludeId) => g.workouts.filter(w => w.done && w.id !== excludeId);
   const newestFirst = (x, y) => (x.day === y.day ? (y.updated || 0) - (x.updated || 0) : x.day < y.day ? 1 : -1);
-  const doneKgs = sets => sets.filter(s => s.done && typeof s.kg === 'number').map(s => s.kg);
+  const doneKgs = sets => sets.filter(s => s.done && !s.warm && typeof s.kg === 'number').map(s => s.kg); // warm-ups never count
   function todayTemplate(data, day) {
     return gymOf(data).templates.find(t => t.days.includes(dow(day))) || null;
   }
@@ -190,18 +237,22 @@
   function lastSets(data, exId, excludeId) {
     const w = finishedWorkouts(gymOf(data), excludeId).filter(x => x.items.some(i => i.ex === exId)).sort(newestFirst)[0];
     if (!w) return null;
-    return w.items.find(i => i.ex === exId).sets.filter(s => s.done).map(s => (typeof s.kg === 'number' ? { kg: s.kg, reps: s.reps } : { reps: s.reps }));
+    return w.items.find(i => i.ex === exId).sets.filter(s => s.done).map(s => {
+      const o = typeof s.kg === 'number' ? { kg: s.kg, reps: s.reps } : { reps: s.reps };
+      if (s.warm) o.warm = true;
+      return o;
+    });
   }
-  // `count` rows from last time (its last row repeats), else the target's lower bound ('8-12' → 8) with empty kg
-  function prefillSets(data, exId, count, reps) {
-    const last = lastSets(data, exId) || [], low = parseInt(reps, 10) || 8;
-    return Array.from({ length: count }, (_, k) => (last.length ? { ...last[Math.min(k, last.length - 1)], done: false } : { reps: low, done: false }));
+  // last time's rows (warm-ups kept), else the training style's working rows, empty (reps 0 = not filled in)
+  function prefillSets(data, exId) {
+    const last = lastSets(data, exId);
+    return last && last.length ? last.map(s => ({ ...s, done: false })) : Array.from({ length: styleOf(data).firstRows }, () => ({ reps: 0, done: false }));
   }
   function startWorkout(data, day, tplId, now = Date.now()) {
     const g = gymOf(data), draft = g.workouts.find(w => !w.done);
     if (draft) return draft;
     const tpl = g.templates.find(t => t.id === tplId);
-    const w = { id: newId(), day, items: tpl ? tpl.items.map(i => ({ ex: i.ex, sets: prefillSets(data, i.ex, i.sets, i.reps) })) : [], done: false, updated: now };
+    const w = { id: newId(), day, items: tpl ? tpl.items.map(i => ({ ex: i.ex, sets: prefillSets(data, i.ex) })) : [], done: false, updated: now };
     if (tpl) w.tpl = tpl.id;
     g.workouts.push(w);
     return w;
@@ -414,7 +465,8 @@
         && (g.templates || []).every(t => t && typeof t.id === 'string' && typeof t.name === 'string'
           && Array.isArray(t.days) && t.days.every(d => int(d, 0, 6)) && Array.isArray(t.items))
         && (g.workouts || []).every(w => w && typeof w.id === 'string' && isKey(w.day) && typeof w.done === 'boolean' && Array.isArray(w.items)
-          && w.items.every(i => i && Array.isArray(i.sets) && i.sets.every(s => s && int(s.reps, 0, 10000) && kgOk(s.kg))));
+          && w.items.every(i => i && Array.isArray(i.sets) && i.sets.every(s => s && int(s.reps, 0, 10000) && kgOk(s.kg) && (s.warm === undefined || typeof s.warm === 'boolean'))))
+        && (g.style === undefined || int(g.style, 0, 4));
     }
   }
 
@@ -458,7 +510,7 @@
     return out;
   }
 
-  const api = { gymOf, mergeGym, deleteGym, GYM_LIBRARY, suggestSplit, applySplit, ensureExercise, linkWorkoutHabit, todayTemplate, lastSets, prefillSets, startWorkout, bestKg, finishWorkout, exerciseHistory, reminderText, reminderPlan, REMIND_HOURS, dayKey, addDays, weekStart, dow, isScheduled, isDone, isPaused, toggle, togglePause, merge, deleteHabit, weekCount, isDue, dayScore, isPerfect, perfectStreak,
+  const api = { gymOf, mergeGym, deleteGym, STYLES, styleOf, SPLIT_KEYS, suggestSplit, applySplit, ensureExercise, setDayWorkout, linkWorkoutHabit, todayTemplate, lastSets, prefillSets, startWorkout, bestKg, finishWorkout, exerciseHistory, reminderText, reminderPlan, REMIND_HOURS, dayKey, addDays, weekStart, dow, isScheduled, isDone, isPaused, toggle, togglePause, merge, deleteHabit, weekCount, isDue, dayScore, isPerfect, perfectStreak,
     streak, bestStreak, percent, percentBetween, monthStats, cellStatus, weakDay, validate, newId, defaultData };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.HabitLogic = api;
