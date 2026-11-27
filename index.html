@@ -480,10 +480,14 @@
   .gi { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); background: none; color: var(--muted); font: italic 700 .9rem Georgia, serif; }
   .gsheet input[data-g=wname], .gsheet input[data-g=libq] { width: 100%; box-sizing: border-box; }
   .gmus { margin: 2px 0 8px; }
-  .gmap { display: flex; justify-content: center; gap: 20px; margin-bottom: 10px; } .gmap .mmap { height: 180px; width: auto; }
-  .gsteps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-  .gsteps figure { margin: 0; } .gsteps .pose { width: 100%; height: auto; display: block; }
-  .gsteps figcaption { font-size: .75rem; color: var(--muted); margin-top: 4px; line-height: 1.3; } .gsteps figcaption b { color: var(--text); }
+  .gshow { display: grid; grid-template-columns: 1fr 1fr 1.3fr; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .gshow .mmap { width: 100%; height: auto; max-height: 210px; } .gshow .pose { width: 100%; height: auto; display: block; }
+  .gcues { margin: 0 0 12px; padding-left: 1.3em; font-size: .8rem; color: var(--muted); line-height: 1.45; }
+  .gitem2 { flex-wrap: wrap; } .gitem2 .gexn { flex: 1; min-width: 0; } .gplan { display: flex; gap: 8px; flex-basis: 100%; } .gplan select { flex: 1; min-width: 0; padding: 6px 8px; font-size: .8rem; }
+  .gor { margin: 18px 0 4px; font-size: .8rem; font-weight: 700; letter-spacing: .04em; color: var(--muted); }
+  .gown { display: flex; gap: 8px; align-items: stretch; } .gown input { flex: 1; min-width: 0; margin: 0; } .gown .btn { width: auto; flex: none; margin: 0; padding: 0 20px; }
+  .gchips.sub .gchip { font-size: .75rem; padding: 5px 10px; }
+  .grows { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 6px; } .grows .gwarm { margin: 0; }
   .gexsheet a.btn { display: block; text-align: center; text-decoration: none; }
   .gdanger { color: #f87171; }
   .gcredit { font-size: .7rem; margin-top: 10px; }
@@ -1010,8 +1014,11 @@ const seg = (act, cur, opts) => `<div class="seg">${opts.map(([v, t]) => `<butto
 let gymSheet = null; // { kind: 'helper' | 'week' | 'library' | 'workout' | 'past' | 'exercise', ... }
 const EX = OlyxExercises; // exercise library: names, muscles, pictures (exercises.js)
 const FULLDAY = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const GROUPS = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core'];
 const styleHint = st => `${st.reps} reps · ${st.rest} rest · ${st.sets} working sets`;
+const tplHint = t => (t && Number.isInteger(t.style) && L.STYLES[t.style] ? styleHint(L.STYLES[t.style]) : ''); // only workouts made by the split helper
+const ORD = ['', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'];
+const opts = (from, to, cur, word) => Array.from({ length: to - from + 1 }, (_, i) => from + i).map(n =>
+  `<option value="${n}"${n === cur ? ' selected' : ''}>${n ? `${n} ${word}${n === 1 ? '' : 's'}` : `No ${word}s`}</option>`).join('');
 const G = () => L.gymOf(data);
 const exName = id => (G().exercises.find(e => e.id === id) || {}).name || 'Deleted exercise';
 const dayList = days => days.length ? [...days].sort((x, y) => x - y).map(d => WD[d]).join(' · ') : 'Any day';
@@ -1061,48 +1068,56 @@ function helperSheet() {
 // My week: weekday chips on top, the chosen day's workout below. A name picked from the list shares that workout.
 function weekSheet() {
   const s = gymSheet, g = G(), day = s.day, tpl = g.templates.find(t => t.days.includes(day));
-  const si = Number.isInteger(g.style) ? g.style : 2, also = tpl ? tpl.days.filter(d => d !== day).map(d => WD[d]).join(', ') : '';
+  const also = tpl ? tpl.days.filter(d => d !== day).map(d => WD[d]).join(', ') : '', hint = tplHint(tpl);
   const chip = i => { const t = g.templates.find(x => x.days.includes(i));
     return `<button class="gwd${i === day ? ' on' : ''}${t ? '' : ' rest'}" data-act="g-wday" data-v="${i}" aria-pressed="${i === day}"><b>${WD[i].slice(0, 2)}</b><span>${t ? esc(t.name.slice(0, 3)) : '–'}</span></button>`; };
   return gymWrap('My week', `
-    <div class="gstyle"><div class="gsl"><span>Strength</span><span>Training style</span><span>Hypertrophy</span></div>
-      <input type="range" min="0" max="4" step="1" value="${si}" data-g="style" aria-label="Training style, strength to hypertrophy">
-      <p class="muted ghint">${styleHint(L.STYLES[si])}</p></div>
     <div class="gweek">${WD.map((_, i) => chip(i)).join('')}</div>
     <h3 class="gh">${FULLDAY[day]}</h3>
     <input data-g="wname" list="gtpls" value="${tpl ? esc(tpl.name) : ''}" placeholder="Workout name, or empty for rest" maxlength="40" aria-label="Workout on ${FULLDAY[day]}">
     <datalist id="gtpls">${g.templates.map(t => `<option value="${esc(t.name)}">`).join('')}</datalist>
     ${also ? `<p class="muted">Also on ${also}. Changes apply to every day with this workout.</p>` : ''}
-    ${tpl ? `<ul class="list gitems">${tpl.items.map((it, k) => `<li class="gitem2"><button class="gexn" data-act="g-exo" data-id="${it.ex}">${esc(exName(it.ex))}</button>
-      <span class="gmv"><button data-act="g-wup" data-k="${k}" aria-label="Move up">↑</button><button data-act="g-wdown" data-k="${k}" aria-label="Move down">↓</button><button data-act="g-wdel" data-k="${k}" aria-label="Remove">×</button></span></li>`).join('')}</ul>
+    ${hint ? `<p class="ghint gwhint">${hint}</p>` : ''}
+    ${tpl ? `<ul class="list gitems">${tpl.items.map((it, k) => { const p = L.planOf(it);
+      return `<li class="gitem2"><button class="gexn" data-act="g-exo" data-id="${it.ex}">${esc(exName(it.ex))}</button>
+      <span class="gmv"><button data-act="g-wup" data-k="${k}" aria-label="Move up">↑</button><button data-act="g-wdown" data-k="${k}" aria-label="Move down">↓</button><button data-act="g-wdel" data-k="${k}" aria-label="Remove">×</button></span>
+      <div class="gplan"><select data-g="wsets" data-k="${k}" aria-label="Working sets for ${esc(exName(it.ex))}">${opts(1, 8, p.sets, 'set')}</select>
+        <select data-g="wwarm" data-k="${k}" aria-label="Warm-up sets for ${esc(exName(it.ex))}">${opts(0, 4, p.warm, 'warm-up')}</select></div></li>`; }).join('')}</ul>
       <button class="btn" data-act="g-wadd">+ Add exercise</button>
       <button class="btn link" data-act="g-wrest">Make it a rest day</button>
       <button class="btn link gdanger" data-act="g-wdelete">Delete "${esc(tpl.name)}"${also ? ' from every day' : ''}</button>` : '<p class="muted">Rest day. Type a workout name above to train on this day.</p>'}
     <button class="btn primary" data-act="g-close">Done</button>`);
 }
-// exercise library: search + muscle groups; your own exercises listed too; + adds to the workout it was opened from
+// exercise library: your own exercise first, then ours by muscle group and subgroup (Arms → Biceps…); + adds to the workout it was opened from
+const libOrder = e => { const gi = EX.GROUPS.findIndex(g => g.name === e.group), gr = EX.GROUPS[gi]; return gi * 10 + (gr.subs ? gr.subs.indexOf(e.sub) : 0); };
+const LIB = [...EX.LIST].sort((x, y) => libOrder(x) - libOrder(y)); // stable: keeps the list order inside a subgroup
 function libRows() {
   const s = gymSheet, q = (s.q || '').trim().toLowerCase();
   const own = G().exercises.filter(e => !e.lib && !EX.find(e.name)).map(e => ({ name: e.name, id: e.id, group: 'Yours' }));
-  const list = [...EX.LIST.map(e => ({ name: e.name, lib: e.key, group: e.group })), ...own]
-    .filter(e => (!s.group || e.group === s.group) && (!q || e.name.toLowerCase().includes(q)));
-  const rows = list.map(e => `<li class="glr"><span>${esc(e.name)}</span>${e.lib ? `<button class="gi" data-act="g-exo" data-lib="${e.lib}" aria-label="How to do ${esc(e.name)}">i</button>` : ''}
-    <button class="gs" data-act="g-libadd" ${e.lib ? `data-lib="${e.lib}"` : `data-id="${e.id}"`} aria-label="Add ${esc(e.name)}">+</button></li>`).join('');
-  const custom = q && !list.some(e => e.name.toLowerCase() === q) ? `<li><button class="btn link" data-act="g-libcustom">Add "${esc(s.q.trim())}" as your own exercise</button></li>` : '';
-  return rows + custom || '<li class="muted">No exercises match.</li>';
+  const list = [...LIB.map(e => ({ name: e.name, lib: e.key, group: e.group, sub: e.sub })), ...own]
+    .filter(e => (!s.group || e.group === s.group) && (!s.sub || e.sub === s.sub) && (!q || e.name.toLowerCase().includes(q)));
+  return list.map(e => `<li class="glr"><span>${esc(e.name)}</span>${e.lib ? `<button class="gi" data-act="g-exo" data-lib="${e.lib}" aria-label="How to do ${esc(e.name)}">i</button>` : ''}
+    <button class="gs" data-act="g-libadd" ${e.lib ? `data-lib="${e.lib}"` : `data-id="${e.id}"`} aria-label="Add ${esc(e.name)}">+</button></li>`).join('')
+    || '<li class="muted">No exercises match. Add it as your own exercise above.</li>';
 }
 function librarySheet() {
-  const s = gymSheet;
-  return gymWrap('Add exercise', `<input data-g="libq" value="${esc(s.q || '')}" placeholder="Search exercises" aria-label="Search exercises">
-    <div class="gchips">${['All', ...GROUPS, ...(G().exercises.some(e => !e.lib && !EX.find(e.name)) ? ['Yours'] : [])].map(gr =>
-      `<button class="gchip${(s.group || 'All') === gr ? ' on' : ''}" data-act="g-lgroup" data-v="${gr}">${gr}</button>`).join('')}</div>
+  const s = gymSheet, gr = EX.GROUPS.find(g => g.name === s.group);
+  const chip = (act, v, on, text = v) => `<button class="gchip${on ? ' on' : ''}" data-act="${act}" data-v="${esc(v)}" aria-pressed="${on}">${esc(text)}</button>`;
+  return gymWrap('Add exercise', `<h3 class="gh">My own exercise</h3>
+    <div class="gown"><input data-g="libown" value="${esc(s.own || '')}" placeholder="Exercise name" maxlength="40" aria-label="Your own exercise name">
+      <button class="btn primary" data-act="g-libown">Add</button></div>
+    <p class="gor">OR CHOOSE FROM OUR LIBRARY</p>
+    <input data-g="libq" value="${esc(s.q || '')}" placeholder="Search exercises" aria-label="Search exercises">
+    <div class="gchips">${['All', ...EX.GROUPS.map(g => g.name), ...(G().exercises.some(e => !e.lib && !EX.find(e.name)) ? ['Yours'] : [])]
+      .map(v => chip('g-lgroup', v, (s.group || 'All') === v)).join('')}</div>
+    ${gr && gr.subs ? `<div class="gchips sub">${chip('g-lsub', '', !s.sub, `All ${gr.name.toLowerCase()}`)}${gr.subs.map(v => chip('g-lsub', v, s.sub === v)).join('')}</div>` : ''}
     <ul class="list glib" id="glib">${libRows()}</ul>`);
 }
 // the library adds to a workout template (My week) or to the open workout
 function addExerciseTo(target, exId, now) {
   const g = G();
-  if (target.kind === 'tpl') { const t = g.templates.find(x => x.id === target.id); if (t) { t.items.push({ ex: exId }); t.updated = now; } }
-  else { const w = g.workouts.find(x => x.id === target.id); if (w) { w.items.push({ ex: exId, sets: L.prefillSets(data, exId) }); w.updated = now; } }
+  if (target.kind === 'tpl') { const t = g.templates.find(x => x.id === target.id); if (t) { t.items.push({ ex: exId, sets: 3, warm: 0 }); t.updated = now; } }
+  else { const w = g.workouts.find(x => x.id === target.id); if (w) { w.items.push(L.workoutItem(data, exId)); w.updated = now; } }
 }
 // a workout name typed or picked for the open day (applied on change, not on every key)
 function setWeekDay(name) {
@@ -1170,9 +1185,11 @@ function gymAction(b) {
       L.deleteGym(data, 'templates', t.id, now); syncWorkoutHabit(); save(); Sfx.play('remove');
       break;
     }
-    case 'g-lgroup': s.group = v === 'All' ? null : v; break;
-    case 'g-libadd': case 'g-libcustom': {
-      const lib = b.dataset.lib, name = b.dataset.act === 'g-libcustom' ? (s.q || '').trim() : lib ? EX.byKey(lib).name : '';
+    case 'g-lgroup': s.group = v === 'All' ? null : v; s.sub = null; break;
+    case 'g-lsub': s.sub = v || null; break;
+    case 'g-libadd': case 'g-libown': {
+      const lib = b.dataset.lib, name = b.dataset.act === 'g-libown' ? (s.own || '').trim() : lib ? EX.byKey(lib).name : '';
+      if (b.dataset.act === 'g-libown' && !name) { toast('Type a name first'); return; }
       const exId = b.dataset.id || (name && L.ensureExercise(data, name, now, lib));
       if (!exId) return;
       addExerciseTo(s.target, exId, now); save(); gymSheet = s.from; Sfx.play('pop');
@@ -1192,15 +1209,23 @@ document.addEventListener('change', ev => {
   const g = ev.target.dataset && ev.target.dataset.g;
   if (g === 'wname' && gymSheet && gymSheet.kind === 'week') setWeekDay(ev.target.value);
   if (g === 'hstyle' && gymSheet && gymSheet.kind === 'helper') render(); // the preview depends on the style
+  if ((g === 'wsets' || g === 'wwarm') && gymSheet && gymSheet.kind === 'week') { // sets / warm-ups of one exercise in this workout
+    const t = G().templates.find(x => x.days.includes(gymSheet.day)), it = t && t.items[Number(ev.target.dataset.k)];
+    if (it) { it[g === 'wsets' ? 'sets' : 'warm'] = Number(ev.target.value); t.updated = Date.now(); save(); }
+  }
 });
-document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.dataset && ev.target.dataset.g === 'wname') ev.target.blur(); });
+document.addEventListener('keydown', ev => {
+  const f = ev.key === 'Enter' && ev.target.dataset && ev.target.dataset.g;
+  if (f === 'wname') ev.target.blur();
+  if (f === 'libown') document.querySelector('[data-act="g-libown"]').click();
+});
 document.addEventListener('input', ev => {
   const el = ev.target, f = el.dataset && el.dataset.g;
   if (!f || !gymSheet) return;
   const k = Number(el.dataset.k);
   if (f === 'libq') { gymSheet.q = el.value; document.getElementById('glib').innerHTML = libRows(); }
   else if (f === 'hstyle') { gymSheet.style = Number(el.value); el.parentNode.querySelector('.ghint').textContent = styleHint(L.STYLES[gymSheet.style]); }
-  else if (f === 'style') { G().style = Number(el.value); el.parentNode.querySelector('.ghint').textContent = styleHint(L.STYLES[G().style]); save(); }
+  else if (f === 'libown') gymSheet.own = el.value;
   else if (f === 'wkg' || f === 'wreps') workoutInput(el, f);
 });
 
@@ -1209,16 +1234,20 @@ const fmtSets = sets => sets.map(s => (s.warm ? 'W ' : '') + (typeof s.kg === 'n
 function workoutSheet() {
   const g = G(), w = g.workouts.find(x => x.id === gymSheet.id);
   if (!w) { gymSheet = null; return ''; }
-  const tpl = g.templates.find(t => t.id === w.tpl);
+  const tpl = g.templates.find(t => t.id === w.tpl), hint = tplHint(tpl);
   return gymWrap(`${tpl ? tpl.name : 'Workout'} · ${label(w.day)}`, `
-    <p class="ghint gwhint">${styleHint(L.styleOf(data))}</p>
+    ${hint ? `<p class="ghint gwhint">${hint}</p>` : ''}
     ${w.items.map((it, a) => {
-      const last = L.lastSets(data, it.ex, w.id), best = L.bestKg(data, it.ex, w.id), warm = it.sets.some(s => s.warm);
+      const last = L.lastSets(data, it.ex, w.id), best = L.bestKg(data, it.ex, w.id);
+      // chips from the plan: "2nd set"… adds/removes working sets, "1st warm-up"… warm-ups (older drafts: 3 / 2)
+      const plan = it.plan ? L.planOf(it.plan) : { sets: 3, warm: 2 }, nw = it.sets.filter(s => s.warm).length, ns = it.sets.length - nw;
+      const rowChip = (warm, i, have) => `<button class="gwarm${have >= i ? ' on' : ''}" data-act="g-rows" data-a="${a}" data-w="${warm ? 1 : ''}" data-v="${i}" aria-pressed="${have >= i}">${CHECK}${ORD[i]} ${warm ? 'warm-up' : 'set'}</button>`;
+      const chips = [...Array.from({ length: plan.sets - 1 }, (_, i) => rowChip(false, i + 2, ns)), ...Array.from({ length: plan.warm }, (_, i) => rowChip(true, i + 1, nw))].join('');
       let n = 0; // working-set number (warm-ups show W)
       return `<div class="gex"><div class="gexh"><button class="gexn" data-act="g-exo" data-id="${it.ex}">${esc(exName(it.ex))}</button>
         <button class="gx" data-act="g-wexdel" data-a="${a}" aria-label="Remove ${esc(exName(it.ex))}">×</button></div>
         <p class="muted gmeta">${[last && last.length ? 'last: ' + fmtSets(last) : '', best !== null ? `best ${best} kg` : ''].filter(Boolean).join(' · ') || 'First time'}</p>
-        <button class="gwarm${warm ? ' on' : ''}" data-act="g-warm" data-a="${a}" aria-pressed="${warm}">${CHECK}Warm-up</button>
+        ${chips ? `<div class="grows">${chips}</div>` : ''}
         ${it.sets.map((s, k) => `<div class="gset${s.done ? ' done' : ''}${s.warm ? ' warm' : ''}"><span>${s.warm ? 'W' : ++n}</span>
           <input data-g="wkg" data-a="${a}" data-k="${k}" inputmode="decimal" placeholder="kg" value="${typeof s.kg === 'number' ? s.kg : ''}" aria-label="Set ${k + 1} kg">
           <input data-g="wreps" data-a="${a}" data-k="${k}" inputmode="numeric" placeholder="reps" value="${s.reps || s.done ? s.reps : ''}" aria-label="Set ${k + 1} reps">
@@ -1255,15 +1284,11 @@ function workoutAction(b) {
       else Sfx.play('untick');
       return true;
     }
-    case 'g-warm': { // on: a W row on top, prefilled from the last warm-up; off: warm rows go
-      const it = w.items[a];
-      if (it.sets.some(s => s.warm)) it.sets = it.sets.filter(s => !s.warm);
-      else {
-        const lw = (L.lastSets(data, it.ex, w.id) || []).find(s => s.warm), row = { reps: lw ? lw.reps : 0, done: false, warm: true };
-        if (lw && typeof lw.kg === 'number') row.kg = lw.kg;
-        it.sets.unshift(row);
-      }
-      w.updated = now; save();
+    case 'g-rows': { // a "2nd set" / "1st warm-up" chip: on = that many rows, off = one fewer (done rows stay)
+      const warm = !!b.dataset.w, i = Number(b.dataset.v), have = w.items[a].sets.filter(s => !!s.warm === warm).length;
+      L.setRowCount(data, w, a, warm, have >= i ? i - 1 : i, now);
+      if (w.items[a].sets.filter(s => !!s.warm === warm).length === have) { toast('Done sets stay', 'Untick a set to remove it'); return false; }
+      save();
       return true;
     }
     case 'g-addset': {
@@ -1347,8 +1372,8 @@ function exerciseSheet() {
   }
   const words = list => list.map(m => MUSCLE_WORDS[m] || m.toLowerCase()).join(', ');
   const how = entry ? `<p class="muted gmus">${words(entry.muscles.main)}${entry.muscles.help.length ? ` · also ${words(entry.muscles.help)}` : ''}</p>
-    <div class="gmap">${EX.muscleMapSvg(entry.muscles.main, entry.muscles.help)}</div>
-    <div class="gsteps">${EX.stepsOf(entry).map((st, i) => `<figure>${EX.poseSvg(st.pose, `${name}, step ${i + 1}: ${st.cap}`)}<figcaption><b>${i + 1}</b> ${esc(st.cap)}</figcaption></figure>`).join('')}</div>` : '';
+    <div class="gshow">${EX.muscleMapSvg(entry.muscles.main, entry.muscles.help)}${EX.animSvg(entry, `${name}, how it moves`)}</div>
+    <ol class="gcues">${EX.stepsOf(entry).map(st => `<li>${esc(st.cap)}</li>`).join('')}</ol>` : '';
   const video = `<a class="btn" href="https://www.youtube.com/results?search_query=${encodeURIComponent(name + ' proper form')}" target="_blank" rel="noopener">Watch video</a>`;
   const stats = id && hist.length ? `<div class="cards gcards"><div class="card"><b>${best === null ? '—' : best + ' kg'}</b><span>Heaviest</span></div>
       <div class="card"><b>${top ? `${top.kg} × ${top.reps}` : '—'}</b><span>Best set</span></div>
@@ -1459,6 +1484,7 @@ const still = () => ui.motion === 'still';
 function applyMotion() {
   document.body.classList.toggle('calm', calm());
   document.body.classList.toggle('still', still());
+  if (calm()) document.querySelectorAll('svg.pose').forEach(s => { s.pauseAnimations(); s.setCurrentTime(1.6); }); // reduced motion: hold pose 3
 }
 function nextCelebration() {
   if (document.querySelector('.cel') || !queue.length) return;

@@ -380,7 +380,7 @@ assert.notStrictEqual(L.newId(), L.newId());
   let s = L.suggestSplit({ perWeek: 3, daysOff: [5, 6], minutes: 60, style: 2 });
   assert.deepStrictEqual(s.map(t => t.name), ['Push', 'Pull', 'Legs']);
   assert.deepStrictEqual(s.map(t => t.days), [[0], [2], [4]]);
-  assert.ok(s.every(t => t.items.length === 5 && t.items.every(i => Object.keys(i).join() === 'lib')));
+  assert.ok(s.every(t => t.items.length === 5 && t.items.every(i => Object.keys(i).join() === 'lib,sets,warm')));
   assert.deepStrictEqual(keys(s[0]).slice(0, 3), ['bench-press', 'overhead-press', 'lateral-raise']);
   s = L.suggestSplit({ perWeek: 3, daysOff: [0], minutes: 60, style: 2 });
   assert.deepStrictEqual(s.flatMap(t => t.days).sort(), [1, 2, 4]);                        // Monday off → Tue/Wed/Fri
@@ -426,12 +426,15 @@ assert.notStrictEqual(L.newId(), L.newId());
   assert.strictEqual(L.todayTemplate(d, T).id, 't1');                  // T is a Thursday
   assert.strictEqual(L.todayTemplate(d, '2026-11-20'), null);
   const w1 = L.startWorkout(d, T, 't1', 10);
-  assert.deepStrictEqual(w1.items[0].sets, [{ reps: 0, done: false }, { reps: 0, done: false }]); // v20 item sets:3/reps ignored; Balanced = 2 empty rows
+  assert.deepStrictEqual(w1.items[0].sets, [{ reps: 0, done: false }]);   // one empty working set to start
+  assert.deepStrictEqual(w1.items[0].plan, { sets: 3, warm: 0 });         // v20 item sets:3 kept, reps ignored
   assert.strictEqual(L.startWorkout(d, T, 't1', 11).id, w1.id);          // a draft is continued, not duplicated
   w1.items[0].sets = [{ kg: 80, reps: 8, done: true }, { kg: 82.5, reps: 8, done: true }, { kg: 82.5, reps: 7, done: true }];
   assert.deepStrictEqual(L.finishWorkout(d, w1.id, 20).records, []);   // first time ever: no record
   assert.ok(L.isDone(d, 'd', T));                                       // linked habit ticked
   const w2 = L.startWorkout(d, '2026-11-26', 't1', 30);
+  assert.deepStrictEqual(w2.items[0].sets.map(s => [s.kg, s.reps, s.done]), [[80, 8, false]]);
+  L.setRowCount(d, w2, 0, false, 3, 31);                                // "3rd set" chip: rows 2 and 3 from last time's 2nd and 3rd
   assert.deepStrictEqual(w2.items[0].sets.map(s => [s.kg, s.reps, s.done]), [[80, 8, false], [82.5, 8, false], [82.5, 7, false]]);
   assert.deepStrictEqual(L.lastSets(d, 'e1', w2.id).map(s => s.kg), [80, 82.5, 82.5]);
   w2.items[0].sets[0] = { kg: 85, reps: 6, done: true };
@@ -482,7 +485,6 @@ assert.notStrictEqual(L.newId(), L.newId());
 // --- gym v2: training style, my week, warm-ups ---
 {
   assert.strictEqual(L.styleOf(data([])).label, 'Balanced');
-  assert.strictEqual(L.styleOf(data([])).firstRows, 2);
   assert.deepStrictEqual(L.STYLES.map(s => s.reps), ['4–8', '5–9', '6–10', '7–11', '8–12']);
 
   // my week: one workout per day, shared by name, copy on a new name, rename when used only here
@@ -496,7 +498,7 @@ assert.notStrictEqual(L.newId(), L.newId());
   assert.deepStrictEqual(up.days, [0, 4]);
   const upB = L.setDayWorkout(d, 4, 'Upper B', 4);                       // shared → copy, Monday keeps Upper
   assert.notStrictEqual(upB.id, up.id);
-  assert.deepStrictEqual(upB.items, up.items);
+  assert.deepStrictEqual(upB.items.map(i => i.ex), up.items.map(i => i.ex));
   assert.deepStrictEqual(up.days, [0]);
   assert.strictEqual(L.setDayWorkout(d, 2, '', 5), null);                // rest day
   assert.deepStrictEqual(low.days, []);
@@ -509,18 +511,20 @@ assert.notStrictEqual(L.newId(), L.newId());
   assert.strictEqual(L.ensureExercise(d, 'BENCH press', 7), up.items[0].ex);  // name match
   assert.strictEqual(L.ensureExercise(d, 'Flat bench', 8, 'bench-press'), up.items[0].ex); // lib match wins
 
-  // warm-ups never count; prefill keeps them; first time = the style's working rows
+  // warm-ups never count; a warm-up chip prefills from last time's warm-up
   const g = Object.assign(data([daily()]), { gym: { habitId: 'd', exercises: [{ id: 'e1', name: 'Bench press', updated: 1 }],
     templates: [{ id: 't1', name: 'Push', days: [3], items: [{ ex: 'e1' }], updated: 1 }], workouts: [] } });
   const w1 = L.startWorkout(g, T, 't1', 10);
-  assert.deepStrictEqual(w1.items[0].sets, [{ reps: 0, done: false }, { reps: 0, done: false }]);
+  assert.deepStrictEqual(w1.items[0].sets, [{ reps: 0, done: false }]);
   w1.items[0].sets = [{ kg: 120, reps: 5, done: true, warm: true }, { kg: 80, reps: 8, done: true }, { kg: 80, reps: 8, done: true }];
   L.finishWorkout(g, w1.id, 20);
   assert.strictEqual(L.bestKg(g, 'e1'), 80);
   assert.deepStrictEqual(L.exerciseHistory(g, 'e1'), [{ day: T, kg: 80 }]);
   const w2 = L.startWorkout(g, '2026-11-26', 't1', 30);
-  assert.strictEqual(w2.items[0].sets.length, 3);
+  assert.deepStrictEqual(w2.items[0].sets, [{ kg: 80, reps: 8, done: false }]);
+  L.setRowCount(g, w2, 0, true, 1, 31);                                  // "1st warm-up" chip: on top
   assert.deepStrictEqual(w2.items[0].sets[0], { kg: 120, reps: 5, done: false, warm: true });
+  assert.strictEqual(w2.items[0].sets.length, 2);
   w2.items[0].sets = [{ kg: 200, reps: 1, done: true, warm: true }, { kg: 85, reps: 6, done: true }];
   assert.deepStrictEqual(L.finishWorkout(g, w2.id, 40).records, [{ ex: 'e1', kg: 85 }]);
   assert.ok(L.validate(g));
@@ -543,6 +547,41 @@ assert.notStrictEqual(L.newId(), L.newId());
   assert.notStrictEqual(nd.id, draft.id);
 }
 
+// --- gym v3: sets and warm-ups per exercise, chips, style only on helper workouts ---
+{
+  const s = L.suggestSplit({ perWeek: 3, minutes: 60, style: 0 });
+  assert.deepStrictEqual(s[0].items.map(i => [i.sets, i.warm]).slice(0, 3), [[3, 2], [3, 2], [3, 0]]); // Strength = 3 sets; 2 compounds warmed up
+  assert.strictEqual(s[0].style, 0);
+  const d = data([daily()]);
+  L.applySplit(d, s, T, 5);
+  const t = d.gym.templates[0];
+  assert.strictEqual(t.style, 0);
+  assert.deepStrictEqual([t.items[0].sets, t.items[0].warm], [3, 2]);
+  const own = L.setDayWorkout(d, 6, 'Arms', 6);
+  assert.strictEqual(own.style, undefined);                               // own workouts: no style
+  assert.deepStrictEqual(L.planOf({ ex: 'x' }), { sets: 3, warm: 0 });   // v2 item
+  assert.deepStrictEqual(L.planOf({ sets: 9, warm: -1 }), { sets: 3, warm: 0 });
+  assert.deepStrictEqual(L.planOf({ sets: 5, warm: 4 }), { sets: 5, warm: 4 });
+
+  // chips: done rows are never removed; at least one working set; mid-workout exercise = 3 sets / 2 warm-ups
+  const w = L.startWorkout(d, T, t.id, 10);
+  assert.deepStrictEqual(w.items[0].plan, { sets: 3, warm: 2 });
+  assert.strictEqual(w.items[0].sets.length, 1);
+  L.setRowCount(d, w, 0, false, 3, 11);
+  L.setRowCount(d, w, 0, true, 2, 12);
+  assert.deepStrictEqual(w.items[0].sets.map(x => !!x.warm), [true, true, false, false, false]);
+  w.items[0].sets[3].done = true;
+  L.setRowCount(d, w, 0, false, 1, 13);                                   // 3rd goes, 2nd is done: stays
+  assert.deepStrictEqual(w.items[0].sets.map(x => !!x.warm), [true, true, false, false]);
+  L.setRowCount(d, w, 0, false, 0, 14);
+  L.setRowCount(d, w, 0, true, 0, 15);
+  assert.strictEqual(w.items[0].sets.length, 2);
+  assert.ok(w.items[0].sets.every(x => !x.warm));
+  const mid = L.workoutItem(d, 'e9');
+  assert.deepStrictEqual(mid, { ex: 'e9', plan: { sets: 3, warm: 2 }, sets: [{ reps: 0, done: false }] });
+  assert.ok(L.validate(d));
+}
+
 // --- exercise library (exercises.js) ---
 {
   const EX = require('./exercises.js');
@@ -563,7 +602,16 @@ assert.notStrictEqual(L.newId(), L.newId());
   assert.strictEqual(EX.find('nope'), null);
   const map = EX.muscleMapSvg(['CHEST'], ['TRICEPS']);
   assert.ok(map.includes('#E24B4A') && map.includes('#F09595') && map.split('<svg').length === 3);
-  const svg = EX.poseSvg(EX.stepsOf(EX.byKey('squat'))[0].pose, 'x');
+  // v3: subgroups of 5-10, and every pose of an exercise has the same shapes (the animation morphs them)
+  for (const g of EX.GROUPS) for (const sub of g.subs || [g.name]) {
+    const n = EX.LIST.filter(e => e.group === g.name && (!g.subs || e.sub === sub)).length;
+    assert.ok(n >= 5 && n <= 10, sub + ' has ' + n);
+  }
+  assert.ok(EX.LIST.every(e => !!e.sub === !!EX.GROUPS.find(g => g.name === e.group).subs), 'sub missing');
+  const shape = p => JSON.stringify([p.parts.map(q => q.p.split(' ').length + q.c), p.gear.map(g => Object.keys(g).join() + (g.line ? g.line.split(' ').length : ''))]);
+  for (const e of EX.LIST) { const ps = EX.stepsOf(e).map(s => shape(s.pose)); assert.ok(ps.every(x => x === ps[0]), 'poses differ: ' + e.key); }
+  const svg = EX.animSvg(EX.byKey('squat'), 'Squat "x"');
+  assert.ok(svg.includes('<animate attributeName="points"') && svg.includes('&quot;x&quot;'));
   assert.ok(svg.startsWith('<svg') && svg.includes('#E24B4A'));
   assert.ok(/MIT/.test(EX.CREDIT));
 }

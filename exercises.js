@@ -24,17 +24,6 @@
       pts.map(p => `<polygon points="${p}" fill="${fill(m)}"/>`).join('')).join('')}</svg>`;
     return view('front', 'Front view, worked muscles in red') + view('back', 'Back view, worked muscles in red');
   }
-  function poseSvg(pose, label) {
-    const line = (p, w, col) => `<polyline points="${p}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`;
-    const gear = (pose.gear || []).map(g => g.circle ? `<circle cx="${g.circle[0]}" cy="${g.circle[1]}" r="${g.circle[2]}" fill="none" stroke="${C.gear}" stroke-width="${g.w || 4}"/>`
-      : g.rect ? `<rect x="${g.rect[0]}" y="${g.rect[1]}" width="${g.rect[2]}" height="${g.rect[3]}" rx="2" fill="${C.gear}"/>`
-      : line(g.line, g.w || 2, C.gear)).join('');
-    const body = pose.parts.map(q => line(q.p, q.w + 3, C.edge) + line(q.p, q.w, C[q.c] || C.body)).join('');
-    const head = `<circle cx="${pose.head[0]}" cy="${pose.head[1]}" r="9" fill="${C.body}" stroke="${C.edge}" stroke-width="1.5"/>`;
-    const arrow = pose.arrow ? `<path d="${pose.arrow}" fill="none" stroke="${C.arrow}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>` : '';
-    return `<svg viewBox="0 0 120 140" class="pose" role="img" aria-label="${label}"><rect width="120" height="140" rx="10" fill="${C.edge}"/>`
-      + `<line x1="8" y1="133" x2="112" y2="133" stroke="#2a2f38" stroke-width="2"/>${gear}${body}${head}${arrow}</svg>`;
-  }
 
   // mannequin from joint angles (degrees: 0 = right, 90 = up). Limb lengths stay the same in every picture.
   // anchor: ankle (standing) or hip. thigh = hip→knee, shin = knee→ankle, torso = hip→shoulder, arm = shoulder→elbow, fore = elbow→hand.
@@ -91,6 +80,45 @@
   const hang = o => fig({ hip: [60, 76], torso: 90, thigh: 270, shin: 270, foot: 300, ...o });
   const FRONT = { front: true, hip: [60, 82], torso: 90, thigh: 275, shin: 270, foot: 0, thigh2: 265, shin2: 270, foot2: 180 };
   const fr = o => fig({ ...FRONT, ...o });
+
+  // v3 helpers: seated machine, and one-number pose makers for the new entries
+  const SEAT = [{ rect: [26, 102, 34, 6] }, { rect: [24, 56, 6, 46] }];
+  const seat = o => fig({ hip: [40, 100], torso: 95, thigh: 0, shin: 270, foot: 0, ...o, gear: J => [...SEAT, ...(o.gear ? o.gear(J) : [])] });
+  const S = (cap, pose) => ({ cap, pose });
+  const hyper = t => fig({ hip: [62, 78], thigh: 225, shin: 225, foot: 315, torso: t, arm: t + 200, fore: t + 20, hi: { torso: 'main', thigh: 'help' },
+    gear: () => [ln([62, 89], [73, 78], 6), ln([20, 108], [32, 120], 5), ln([66, 86], [50, 133], 3), ln([26, 116], [34, 133], 3)] });
+  const prone = (t, th, a) => fig({ hip: [60, 124], torso: 180 - t, thigh: th, shin: th, foot: 330 + th, arm: 180 - a, fore: 180 - a, hi: { torso: 'main', thigh: 'help' } });
+  const PREACH = J => [ln(go(J.sh, 225, 7), go(J.el, 225, 7), 5), bell(J.hand)];
+  const wrist = a => fig({ hip: [40, 100], torso: 50, thigh: 0, shin: 270, foot: 0, arm: 270, fore: 0, hi: { arm: 'main' },
+    gear: J => [{ rect: [26, 102, 34, 6] }, ln(J.hand, go(J.hand, a, 4), 3), bell(go(J.hand, a, 6))] });
+  const walk = (a, b) => fig({ hip: [60, 80], torso: 90, thigh: a, shin: a - 5, foot: 0, thigh2: b, shin2: b + 5, foot2: 0, arm: 270, fore: 270, hi: { arm: 'main', torso: 'help' }, gear: J => [bell(J.hand)] });
+  const BAR = () => [ln([22, 8], [98, 8], 4)];
+  const deadHang = y => hang({ front: true, hip: [60, y], thigh2: 268, shin2: 270, foot2: 240, foot: 300, arm: 65, fore: 75, arm2: 115, fore2: 105, hi: { arm: 'main', torso: 'help' }, gear: BAR });
+  const goblet = o => fig({ ankle: [60, 130], foot: 0, arm: 250, fore: 80, hi: { thigh: 'main', torso: 'help' }, gear: J => [bell(J.hand)], ...o });
+  const sCurl = s => fig({ hip: [40, 96], torso: 95, thigh: 0, shin: s, foot: s + 90, arm: 300, fore: 290, hi: { thigh: 'main', shin: 'help' },
+    gear: J => [{ rect: [26, 98, 42, 6] }, { rect: [24, 60, 6, 40] }, { rect: [51, 86, 18, 4] }, { circle: [R1(J.ankle[0]), R1(J.ankle[1] + 6), 5], w: 3 }] });
+  const nordic = (th, t) => fig({ ankle: [34, 127], shin: 180, thigh: th, foot: 200, torso: t, arm: t - 150, fore: t - 60, hi: { thigh: 'main', shin: 'help' }, gear: () => [{ circle: [34, 120, 5], w: 3 }] });
+  const bridge = (th, t) => fig({ ankle: [86, 130], shin: 292, thigh: th, foot: 0, torso: t, arm: 355, fore: 0, hi: { thigh: 'main', shin: 'help' } });
+  const kick = a => st({ torso: 78, thigh2: a, shin2: a, foot2: 0, arm: 330, fore: 10, hi: { thigh: 'main' }, gear: J => [ln([100, 20], [100, 133], 4), ln(J.leg2.an, [8, 128])] });
+  const stepUp = (sn, th, t, th2, sn2) => fig({ ankle: [76, 109], shin: sn, thigh: th, foot: 0, torso: t, thigh2: th2, shin2: sn2, foot2: 0, arm: 270, fore: 270, hi: { thigh: 'main' },
+    gear: J => [{ rect: [64, 112, 40, 21] }, bell(J.hand)] });
+  const abd = a => fr({ hip: [60, 96], len: { thigh: 14 }, thigh: 270 + a, shin: 270, thigh2: 270 - a, shin2: 270, arm: 285, fore: 290, arm2: 255, fore2: 250, hi: { thigh: 'main' },
+    gear: J => [{ rect: [36, 98, 48, 6] }, { circle: [R1(J.knee[0] + 5), R1(J.knee[1]), 4], w: 3 }, { circle: [R1(J.leg2.kn[0] - 5), R1(J.leg2.kn[1]), 4], w: 3 }] });
+  const sCalf = (th, f) => fig({ hip: [40, 96], torso: 95, thigh: th, shin: 270, foot: f, arm: 300, fore: 300, hi: { shin: 'main' },
+    gear: J => [{ rect: [26, 98, 30, 6] }, { rect: [R1(J.knee[0] - 9), R1(J.knee[1] - 10), 18, 4] }, { rect: [69, 119, 22, 8] }] });
+  const lpCalf = f => fig({ hip: [38, 104], torso: 120, thigh: 35, shin: 35, foot: f, arm: 300, fore: 0, hi: { shin: 'main' },
+    gear: J => [ln([34, 112], [8, 66], 6), ln(go(J.toe, 125, 10), go(J.toe, 305, 10), 5)] });
+  const donkey = (an, f) => fig({ ankle: an, shin: 270, thigh: 270, foot: f, torso: 12, arm: 270, fore: 270, hi: { shin: 'main' }, gear: () => [{ rect: [56, 124, 22, 9] }, { rect: [96, 104, 18, 29] }] });
+  const crunch = t => fig({ hip: [60, 124], torso: t, thigh: 50, shin: 300, foot: 0, arm: t - 150, fore: t, hi: { torso: 'main' } });
+  const roll = (th, t, a) => fig({ ankle: [14, 127], shin: 180, thigh: th, foot: 180, torso: t, arm: a, fore: a, hi: { torso: 'main', arm: 'help' },
+    gear: J => [{ circle: [R1(J.hand[0]), R1(J.hand[1] + 6), 6], w: 3 }] });
+  const bug = (th, sn, a) => fig({ hip: [64, 124], torso: 180, thigh: th, shin: sn, foot: sn + 90, thigh2: 90, shin2: 0, foot2: 90, arm: a, fore: a, arm2: 90, fore2: 90, hi: { torso: 'main' } });
+  const rev = (hip, t, th, sn) => fig({ hip, torso: t, thigh: th, shin: sn, foot: sn + 90, arm: 355, fore: 0, hi: { torso: 'main', thigh: 'help' } });
+  const legRaise = a => fig({ hip: [62, 124], torso: 180, thigh: a, shin: a, foot: a + 90, arm: 355, fore: 0, hi: { torso: 'main', thigh: 'help' } });
+  const sidePlank = (hip, t, l) => fr({ hip, torso: t, thigh: l, shin: l, foot: 0, thigh2: l, shin2: l, foot2: 0, arm: 70, fore: 70, arm2: 270, fore2: 180, hi: { torso: 'main' } });
+  const chop = (t, a, a2) => fr({ torso: t, arm: a, fore: a, arm2: a2, fore2: a2, hi: { torso: 'main', arm: 'help' }, gear: J => [ln(J.hand, [114, 8])] });
+  const bike = (th, sn, th2, sn2) => fig({ hip: [60, 124], torso: 150, thigh: th, shin: sn, foot: sn + 90, thigh2: th2, shin2: sn2, foot2: sn2 + 90, arm: 60, fore: 200, hi: { torso: 'main' } });
+  const pallof = (a, f) => st({ arm: a, fore: f, hi: { torso: 'main' }, gear: J => [ln(J.hand, [116, 60]), bell(J.hand)] });
 
   const LIST = [
     // Chest
@@ -230,15 +258,185 @@
       { cap: 'Sit, lean back a little, weight at the chest', pose: fr({ hip: [60, 104], thigh: 330, shin: 270, thigh2: 210, shin2: 270, arm: 250, fore: 160, arm2: 290, fore2: 20, hi: { torso: 'main' }, gear: J => [bell(J.hand)] }) },
       { cap: 'Rotate the shoulders to one side', pose: fr({ hip: [60, 104], thigh: 330, shin: 270, thigh2: 210, shin2: 270, arm: 300, fore: 250, arm2: 270, fore2: 300, hi: { torso: 'main' }, gear: J => [bell(J.hand)], arrow: () => arr(70, 116, 86, 116) }) },
       { cap: 'Then to the other side, keep the chest up', pose: fr({ hip: [60, 104], thigh: 330, shin: 270, thigh2: 210, shin2: 270, arm: 240, fore: 290, arm2: 230, fore2: 250, hi: { torso: 'main' }, gear: J => [bell(J.hand)], arrow: () => arr(50, 116, 34, 116) }) } ] },
+    // ---- v3 additions ----
+    { key: 'incline-bench-press', name: 'Incline bench press', group: 'Chest', compound: true, like: 'bench-press', muscles: { main: ['CHEST', 'FRONT_DELTOIDS'], help: ['TRICEPS'] },
+      caps: ['Bench at about 30°, bar over the upper chest', 'Lower to the top of the chest, elbows in', 'Press back up over the shoulders'] },
+    { key: 'machine-chest-press', name: 'Machine chest press', group: 'Chest', compound: true, muscles: { main: ['CHEST'], help: ['FRONT_DELTOIDS', 'TRICEPS'] }, steps: [
+      S('Handles at mid-chest, back against the pad', seat({ arm: 255, fore: 5, hi: { torso: 'main', arm: 'help' }, gear: J => [bell(J.hand)] })),
+      S('Press forward, shoulders stay back', seat({ arm: 320, fore: 5, hi: { torso: 'main', arm: 'help' }, gear: J => [bell(J.hand)] })),
+      S('Arms long without locking, return slowly', seat({ arm: 350, fore: 358, hi: { torso: 'main', arm: 'help' }, gear: J => [bell(J.hand)] })) ] },
+    { key: 'pec-deck', name: 'Pec deck', group: 'Chest', compound: false, like: 'cable-fly', muscles: { main: ['CHEST'], help: ['FRONT_DELTOIDS'] },
+      caps: ['Sit tall, hands on the handles, arms wide', 'Bring the arms together in an arc', 'Squeeze the chest, open slowly'] },
+    { key: 't-bar-row', name: 'T-bar row', group: 'Back', compound: true, like: 'barbell-row', muscles: { main: ['UPPER_BACK'], help: ['BACK_DELTOIDS', 'BICEPS', 'LOWER_BACK'] },
+      caps: ['Straddle the bar, hinge forward, chest up', 'Pull the handle to the chest', 'Squeeze the back, lower under control'] },
+    { key: 'straight-arm-pulldown', name: 'Straight-arm pulldown', group: 'Back', compound: false, muscles: { main: ['UPPER_BACK'], help: ['TRICEPS', 'BACK_DELTOIDS'] }, steps: [
+      S('Lean forward a little, arms straight up front', st({ torso: 78, arm: 35, fore: 35, hi: { torso: 'main', arm: 'help' }, gear: J => [ln(J.hand, [112, 6])] })),
+      S('Sweep the bar down, arms stay straight', st({ torso: 78, arm: 330, fore: 330, hi: { torso: 'main', arm: 'help' }, gear: J => [ln(J.hand, [112, 6])] })),
+      S('Bar to the thighs, squeeze the lats', st({ torso: 78, arm: 285, fore: 285, hi: { torso: 'main', arm: 'help' }, gear: J => [ln(J.hand, [112, 6])] })) ] },
+    { key: 'back-extension', name: 'Back extension', group: 'Back', compound: false, muscles: { main: ['LOWER_BACK'], help: ['GLUTEAL', 'HAMSTRING'] }, steps: [
+      S('Hips on the pad, upper body hanging down', hyper(300)), S('Lift the chest with a flat back', hyper(0)), S('Stop in line with the legs, lower slowly', hyper(45)) ] },
+    { key: 'good-morning', name: 'Good morning', group: 'Back', compound: true, muscles: { main: ['HAMSTRING', 'LOWER_BACK'], help: ['GLUTEAL'] }, steps: [
+      S('Bar on the upper back, soft knees', st({ arm: 235, fore: 70, hi: { thigh: 'main', torso: 'main' }, gear: J => [plate(J.sh, 15, 1)] })),
+      S('Push the hips back, back stays flat', fig({ ankle: [60, 130], shin: 262, thigh: 300, foot: 0, torso: 50, arm: 235, fore: 70, hi: { thigh: 'main', torso: 'main' }, gear: J => [plate(J.sh, 15, 1)] })),
+      S('Torso near parallel, then drive the hips forward', fig({ ankle: [60, 130], shin: 262, thigh: 305, foot: 0, torso: 12, arm: 235, fore: 70, hi: { thigh: 'main', torso: 'main' }, gear: J => [plate(J.sh, 15, 1)] })) ] },
+    { key: 'superman', name: 'Superman', group: 'Back', compound: false, muscles: { main: ['LOWER_BACK'], help: ['GLUTEAL', 'HAMSTRING'] }, steps: [
+      S('Lie face down, arms reaching forward', prone(0, 0, 0)), S('Lift arms, chest and legs together', prone(8, 6, 12)), S('Hold a moment, lower slowly', prone(15, 12, 20)) ] },
+    { key: 'rack-pull', name: 'Rack pull', group: 'Back', compound: true, like: 'deadlift', muscles: { main: ['LOWER_BACK', 'GLUTEAL'], help: ['TRAPEZIUS', 'HAMSTRING', 'FOREARM'] },
+      caps: ['Bar on the rack just below the knees', 'Push the hips forward, bar close to the legs', 'Stand tall, squeeze the glutes'] },
+    { key: 'arnold-press', name: 'Arnold press', group: 'Shoulders', compound: true, like: 'overhead-press', muscles: { main: ['FRONT_DELTOIDS'], help: ['TRICEPS'] },
+      caps: ['Dumbbells at the chest, palms facing you', 'Turn the palms out as you press up', 'Arms straight overhead, reverse on the way down'] },
+    { key: 'cable-lateral-raise', name: 'Cable lateral raise', group: 'Shoulders', compound: false, like: 'lateral-raise', muscles: { main: ['FRONT_DELTOIDS'], help: ['TRAPEZIUS'] },
+      caps: ['Low pulley, handle across the body', 'Raise out to the side, elbow slightly bent', 'Stop at shoulder height, lower slowly'] },
+    { key: 'front-raise', name: 'Front raise', group: 'Shoulders', compound: false, muscles: { main: ['FRONT_DELTOIDS'], help: ['CHEST'] }, steps: [
+      S('Dumbbells in front of the thighs', st({ arm: 275, fore: 275, hi: { arm: 'main' }, gear: J => [bell(J.hand)] })),
+      S('Raise forward, arms almost straight', st({ arm: 320, fore: 320, hi: { arm: 'main' }, gear: J => [bell(J.hand)] })),
+      S('Stop at shoulder height, lower slowly', st({ arm: 0, fore: 0, hi: { arm: 'main' }, gear: J => [bell(J.hand)] })) ] },
+    { key: 'upright-row', name: 'Upright row', group: 'Shoulders', compound: true, muscles: { main: ['FRONT_DELTOIDS', 'TRAPEZIUS'], help: ['BICEPS'] }, steps: [
+      S('Bar at the thighs, hands shoulder-width', st({ arm: 270, fore: 270, hi: { arm: 'main', torso: 'help' }, gear: J => [plate(J.hand, 9)] })),
+      S('Pull up along the body, elbows lead', st({ arm: 320, fore: 240, hi: { arm: 'main', torso: 'help' }, gear: J => [plate(J.hand, 9)] })),
+      S('Elbows at shoulder height, lower slowly', st({ arm: 0, fore: 200, hi: { arm: 'main', torso: 'help' }, gear: J => [plate(J.hand, 9)] })) ] },
+    { key: 'shrug', name: 'Shrug', group: 'Shoulders', compound: false, muscles: { main: ['TRAPEZIUS'], help: ['FOREARM'] }, steps: [
+      S('Dumbbells at your sides, arms long', st({ arm: 270, fore: 270, hi: { torso: 'main' }, gear: J => [bell(J.hand)] })),
+      S('Lift the shoulders straight up', st({ arm: 270, fore: 270, len: { torso: 40.5 }, hi: { torso: 'main' }, gear: J => [bell(J.hand)] })),
+      S('Hold at the top, lower slowly', st({ arm: 270, fore: 270, len: { torso: 42 }, hi: { torso: 'main' }, gear: J => [bell(J.hand)] })) ] },
+    { key: 'ez-bar-curl', name: 'EZ-bar curl', group: 'Arms', compound: false, like: 'biceps-curl', muscles: { main: ['BICEPS'], help: ['FOREARM'] },
+      caps: ['Grip the angled bar, elbows at your sides', 'Curl up without swinging', 'Squeeze at the top, lower slowly'] },
+    { key: 'cable-curl', name: 'Cable curl', group: 'Arms', compound: false, like: 'biceps-curl', muscles: { main: ['BICEPS'], help: ['FOREARM'] },
+      caps: ['Face the low pulley, elbows at your sides', 'Curl the handle toward the shoulders', 'Squeeze, then lower against the cable'] },
+    { key: 'preacher-curl', name: 'Preacher curl', group: 'Arms', compound: false, muscles: { main: ['BICEPS'], help: ['FOREARM'] }, steps: [
+      S('Upper arms flat on the pad, arms nearly straight', st({ torso: 80, arm: 315, fore: 310, hi: { arm: 'main' }, gear: PREACH })),
+      S('Curl up, upper arms stay on the pad', st({ torso: 80, arm: 315, fore: 40, hi: { arm: 'main' }, gear: PREACH })),
+      S('Stop before vertical, lower all the way', st({ torso: 80, arm: 315, fore: 95, hi: { arm: 'main' }, gear: PREACH })) ] },
+    { key: 'concentration-curl', name: 'Concentration curl', group: 'Arms', compound: false, like: 'preacher-curl', muscles: { main: ['BICEPS'], help: [] },
+      caps: ['Sit, elbow braced on the inner thigh', 'Curl up slowly, upper arm still', 'Squeeze at the top, lower all the way'] },
+    { key: 'close-grip-bench-press', name: 'Close-grip bench press', group: 'Arms', compound: true, like: 'bench-press', muscles: { main: ['TRICEPS', 'CHEST'], help: ['FRONT_DELTOIDS'] },
+      caps: ['Hands shoulder-width, eyes under the bar', 'Lower to the lower chest, elbows tucked', 'Press up, lock out the elbows'] },
+    { key: 'rope-pushdown', name: 'Rope pushdown', group: 'Arms', compound: false, like: 'triceps-pushdown', muscles: { main: ['TRICEPS'], help: [] },
+      caps: ['Rope at chest height, elbows pinned', 'Push down and spread the rope ends', 'Squeeze at the bottom, let it rise slowly'] },
+    { key: 'diamond-push-up', name: 'Diamond push-up', group: 'Arms', compound: true, like: 'push-up', muscles: { main: ['TRICEPS', 'CHEST'], help: ['FRONT_DELTOIDS', 'ABS'] },
+      caps: ['Hands close together under the chest', 'Lower with the elbows close to the body', 'Chest near the hands, push back up'] },
+    { key: 'triceps-kickback', name: 'Triceps kickback', group: 'Arms', compound: false, muscles: { main: ['TRICEPS'], help: [] }, steps: [
+      S('Hinge forward, upper arm along the body', bentOver({ arm: 200, fore: 270, hi: { arm: 'main' }, gear: J => [bell(J.hand)] })),
+      S('Straighten the arm back, elbow stays still', bentOver({ arm: 200, fore: 235, hi: { arm: 'main' }, gear: J => [bell(J.hand)] })),
+      S('Arm straight, squeeze, then lower', bentOver({ arm: 200, fore: 200, hi: { arm: 'main' }, gear: J => [bell(J.hand)] })) ] },
+    { key: 'wrist-curl', name: 'Wrist curl', group: 'Arms', compound: false, muscles: { main: ['FOREARM'], help: [] }, steps: [
+      S('Forearms on the thighs, wrists past the knees', wrist(300)), S('Curl the weight up with the wrists only', wrist(0)), S('Squeeze at the top, lower slowly', wrist(50)) ] },
+    { key: 'reverse-wrist-curl', name: 'Reverse wrist curl', group: 'Arms', compound: false, like: 'wrist-curl', muscles: { main: ['FOREARM'], help: [] },
+      caps: ['Palms down, forearms on the thighs', 'Lift the backs of the hands up', 'Hold, then lower slowly'] },
+    { key: 'reverse-curl', name: 'Reverse curl', group: 'Arms', compound: false, like: 'biceps-curl', muscles: { main: ['FOREARM'], help: ['BICEPS'] },
+      caps: ['Palms facing down, elbows at your sides', 'Curl up, wrists stay straight', 'Squeeze, then lower slowly'] },
+    { key: 'farmers-walk', name: "Farmer's walk", group: 'Arms', compound: true, muscles: { main: ['FOREARM', 'TRAPEZIUS'], help: ['ABS', 'GLUTEAL'] }, steps: [
+      S('Heavy dumbbells at your sides, stand tall', walk(285, 255)), S('Walk with short, quick steps', walk(270, 270)), S('Shoulders back, grip hard the whole way', walk(255, 285)) ] },
+    { key: 'dead-hang', name: 'Dead hang', group: 'Arms', compound: false, muscles: { main: ['FOREARM'], help: ['UPPER_BACK'] }, steps: [
+      S('Grip the bar, hands shoulder-width or wider', deadHang(76)), S('Hang with straight arms, shoulders active', deadHang(74)), S('Breathe and hold as long as you can', deadHang(74)) ] },
+    { key: 'goblet-squat', name: 'Goblet squat', group: 'Legs', compound: true, muscles: { main: ['QUADRICEPS', 'GLUTEAL'], help: ['ADDUCTORS', 'ABS'] }, steps: [
+      S('Hold one dumbbell at the chest', goblet({ shin: 270, thigh: 270, torso: 92 })),
+      S('Sit down between the knees, chest up', goblet({ shin: 250, thigh: 325, torso: 75 })),
+      S('Elbows inside the knees, stand back up', goblet({ shin: 245, thigh: 355, torso: 68 })) ] },
+    { key: 'hack-squat', name: 'Hack squat', group: 'Legs', compound: true, like: 'squat', muscles: { main: ['QUADRICEPS'], help: ['GLUTEAL', 'ADDUCTORS'] },
+      caps: ['Back on the pad, shoulders under the pads', 'Lower under control, knees over the toes', 'Thighs parallel, push up through the feet'] },
+    { key: 'stiff-leg-deadlift', name: 'Stiff-leg deadlift', group: 'Legs', compound: true, like: 'romanian-deadlift', muscles: { main: ['HAMSTRING'], help: ['GLUTEAL', 'LOWER_BACK'] },
+      caps: ['Legs almost straight, bar at the thighs', 'Hinge at the hips, bar close to the legs', 'Feel the stretch, back flat, then stand'] },
+    { key: 'single-leg-rdl', name: 'Single-leg Romanian deadlift', group: 'Legs', compound: true, like: 'romanian-deadlift', muscles: { main: ['HAMSTRING', 'GLUTEAL'], help: ['LOWER_BACK'] },
+      caps: ['Stand on one leg, weight in the other hand', 'Hinge forward, the free leg goes back', 'Body level, hips square, then stand'] },
+    { key: 'seated-leg-curl', name: 'Seated leg curl', group: 'Legs', compound: false, muscles: { main: ['HAMSTRING'], help: ['CALVES'] }, steps: [
+      S('Legs straight, pad under the lower calves', sCurl(0)), S('Curl the heels down and back', sCurl(300)), S('Squeeze, then let the legs rise slowly', sCurl(250)) ] },
+    { key: 'nordic-curl', name: 'Nordic curl', group: 'Legs', compound: false, muscles: { main: ['HAMSTRING'], help: ['GLUTEAL', 'CALVES'] }, steps: [
+      S('Kneel, ankles held down, body upright', nordic(270, 90)), S('Lower forward slowly, hips stay straight', nordic(240, 60)),
+      S('Go as far as you can, catch, push back up', nordic(220, 40)) ] },
+    { key: 'glute-bridge', name: 'Glute bridge', group: 'Legs', compound: false, muscles: { main: ['GLUTEAL'], help: ['HAMSTRING'] }, steps: [
+      S('Lie on your back, knees bent, feet flat', bridge(40, 180)), S('Drive through the heels, lift the hips', bridge(20, 195)),
+      S('Straight line knees to shoulders, squeeze', bridge(0, 207)) ] },
+    { key: 'cable-kickback', name: 'Cable kickback', group: 'Legs', compound: false, muscles: { main: ['GLUTEAL'], help: ['HAMSTRING'] }, steps: [
+      S('Cuff on the ankle, hold the frame', kick(268)), S('Kick the leg straight back, hips square', kick(240)), S('Squeeze the glute at the top, return slowly', kick(215)) ] },
+    { key: 'step-up', name: 'Step-up', group: 'Legs', compound: true, muscles: { main: ['GLUTEAL', 'QUADRICEPS'], help: ['HAMSTRING', 'CALVES'] }, steps: [
+      S('One whole foot flat on the box', stepUp(250, 0, 80, 250, 285)), S('Drive up through the front heel', stepUp(265, 330, 85, 255, 260)),
+      S('Stand tall on the box, step down slowly', stepUp(270, 270, 90, 268, 270)) ] },
+    { key: 'sumo-deadlift', name: 'Sumo deadlift', group: 'Legs', compound: true, like: 'deadlift', muscles: { main: ['GLUTEAL', 'QUADRICEPS', 'ADDUCTORS'], help: ['HAMSTRING', 'LOWER_BACK'] },
+      caps: ['Wide stance, toes out, hands inside the knees', 'Push the knees out, drive the floor away', 'Stand tall, hips through'] },
+    { key: 'hip-abduction', name: 'Hip abduction machine', group: 'Legs', compound: false, muscles: { main: ['GLUTEAL'], help: [] }, steps: [
+      S('Sit tall, pads on the outside of the knees', abd(30)), S('Push the knees out wide', abd(60)), S('Pause, then bring them back slowly', abd(85)) ] },
+    { key: 'single-leg-calf-raise', name: 'Single-leg calf raise', group: 'Legs', compound: false, like: 'calf-raise', muscles: { main: ['CALVES'], help: [] },
+      caps: ['One foot on the step, hold on for balance', 'Rise up as high as you can', 'Pause, lower the heel below the step'] },
+    { key: 'seated-calf-raise', name: 'Seated calf raise', group: 'Legs', compound: false, muscles: { main: ['CALVES'], help: [] }, steps: [
+      S('Pad on the thighs, balls of the feet on the block', sCalf(0, 16)), S('Push up onto the toes', sCalf(10, 353)), S('Pause at the top, lower all the way', sCalf(18, 335)) ] },
+    { key: 'leg-press-calf-raise', name: 'Leg press calf raise', group: 'Legs', compound: false, muscles: { main: ['CALVES'], help: [] }, steps: [
+      S('Legs straight, balls of the feet on the edge', lpCalf(140)), S('Push the platform away with the toes', lpCalf(115)), S('Squeeze, then let the heels come back', lpCalf(95)) ] },
+    { key: 'donkey-calf-raise', name: 'Donkey calf raise', group: 'Legs', compound: false, muscles: { main: ['CALVES'], help: [] }, steps: [
+      S('Hinge forward, hands on a support, heels low', donkey([62, 127], 15)), S('Rise up onto the toes', donkey([63, 120], 340)), S('Pause at the top, lower slowly', donkey([63, 114], 315)) ] },
+    { key: 'crunch', name: 'Crunch', group: 'Core', compound: false, muscles: { main: ['ABS'], help: ['OBLIQUES'] }, steps: [
+      S('On your back, knees bent, arms crossed', crunch(180)), S('Curl the shoulders off the floor', crunch(162)), S('Squeeze the abs, lower slowly', crunch(148)) ] },
+    { key: 'ab-wheel-rollout', name: 'Ab wheel rollout', group: 'Core', compound: false, muscles: { main: ['ABS'], help: ['OBLIQUES', 'UPPER_BACK'] }, steps: [
+      S('Kneel, hands on the wheel under the shoulders', roll(260, 25, 270)), S('Roll forward slowly, belly tight', roll(245, 20, 296)),
+      S('Go as far as your back stays flat, roll back', roll(230, 18, 312)) ] },
+    { key: 'dead-bug', name: 'Dead bug', group: 'Core', compound: false, muscles: { main: ['ABS'], help: ['OBLIQUES'] }, steps: [
+      S('On your back, knees and arms up', bug(90, 0, 90)), S('Reach one arm back, the opposite leg out', bug(55, 15, 115)),
+      S('Low back stays down, return and switch sides', bug(25, 20, 135)) ] },
+    { key: 'reverse-crunch', name: 'Reverse crunch', group: 'Core', compound: false, muscles: { main: ['ABS'], help: ['OBLIQUES'] }, steps: [
+      S('On your back, knees bent at 90°', rev([62, 124], 180, 80, 0)), S('Pull the knees toward the chest', rev([62, 124], 180, 110, 20)),
+      S('Lift the hips a little, lower slowly', rev([64, 118], 190, 125, 40)) ] },
+    { key: 'lying-leg-raise', name: 'Lying leg raise', group: 'Core', compound: false, muscles: { main: ['ABS'], help: [] }, steps: [
+      S('On your back, legs straight, hands by your sides', legRaise(5)), S('Raise the legs, keep them straight', legRaise(45)),
+      S('Legs up, lower slowly, back stays flat', legRaise(85)) ] },
+    { key: 'side-plank', name: 'Side plank', group: 'Core', compound: false, muscles: { main: ['OBLIQUES'], help: ['ABS', 'GLUTEAL'] }, steps: [
+      S('On one forearm, elbow under the shoulder', sidePlank([57, 120], 151, 348)), S('Lift the hips into one straight line', sidePlank([57, 113], 160, 340)),
+      S('Hold, breathe, then switch sides', sidePlank([57, 113], 160, 340)) ] },
+    { key: 'woodchopper', name: 'Cable woodchopper', group: 'Core', compound: false, muscles: { main: ['OBLIQUES'], help: ['ABS', 'FRONT_DELTOIDS'] }, steps: [
+      S('Cable high to one side, arms long', chop(92, 40, 25)), S('Pull down across the body, turn the chest', chop(90, 320, 300)),
+      S('Finish low by the other hip, return slowly', chop(86, 245, 235)) ] },
+    { key: 'bicycle-crunch', name: 'Bicycle crunch', group: 'Core', compound: false, muscles: { main: ['OBLIQUES', 'ABS'], help: [] }, steps: [
+      S('Hands behind the head, shoulders off the floor', bike(100, 20, 15, 15)), S('Elbow toward the opposite knee', bike(60, 0, 60, 0)),
+      S('Switch sides in a slow pedalling motion', bike(15, 15, 100, 20)) ] },
+    { key: 'pallof-press', name: 'Pallof press', group: 'Core', compound: false, muscles: { main: ['OBLIQUES', 'ABS'], help: [] }, steps: [
+      S('Side-on to the cable, handle at the chest', pallof(250, 15)), S('Press straight out, do not let it turn you', pallof(320, 5)),
+      S('Hold with arms long, bring it back slowly', pallof(355, 0)) ] },
   ];
-
+  // groups and their subgroups; a group without subgroups lists its own exercises
+  const GROUPS = [{ name: 'Chest' }, { name: 'Back', subs: ['Lats & upper back', 'Lower back'] }, { name: 'Shoulders' },
+    { name: 'Arms', subs: ['Biceps', 'Triceps', 'Forearms'] }, { name: 'Legs', subs: ['Quads', 'Hamstrings', 'Glutes', 'Calves'] }, { name: 'Core', subs: ['Abs', 'Obliques'] }];
+  const SUB = {
+    'Lats & upper back': 'pull-up chin-up lat-pulldown barbell-row one-arm-dumbbell-row seated-cable-row t-bar-row straight-arm-pulldown',
+    'Lower back': 'deadlift back-extension good-morning superman rack-pull',
+    Biceps: 'biceps-curl hammer-curl ez-bar-curl cable-curl preacher-curl concentration-curl',
+    Triceps: 'triceps-pushdown rope-pushdown skull-crusher overhead-triceps-extension close-grip-bench-press diamond-push-up triceps-kickback',
+    Forearms: 'wrist-curl reverse-wrist-curl reverse-curl farmers-walk dead-hang',
+    Quads: 'squat front-squat goblet-squat hack-squat leg-press leg-extension walking-lunge bulgarian-split-squat',
+    Hamstrings: 'romanian-deadlift stiff-leg-deadlift single-leg-rdl leg-curl seated-leg-curl nordic-curl',
+    Glutes: 'hip-thrust glute-bridge cable-kickback step-up sumo-deadlift hip-abduction',
+    Calves: 'calf-raise single-leg-calf-raise seated-calf-raise leg-press-calf-raise donkey-calf-raise',
+    Abs: 'plank crunch hanging-leg-raise cable-crunch ab-wheel-rollout dead-bug reverse-crunch lying-leg-raise',
+    Obliques: 'russian-twist side-plank woodchopper bicycle-crunch pallof-press',
+  };
   const byKey = key => LIST.find(e => e.key === key) || null;
+  for (const [sub, keys] of Object.entries(SUB)) for (const k of keys.split(' ')) byKey(k).sub = sub;
   const find = name => { const n = String(name || '').trim().toLowerCase(); return LIST.find(e => e.name.toLowerCase() === n) || null; };
   // `like` reuses another entry's pictures; `caps` can replace its captions
   const stepsOf = e => { const base = e.steps || byKey(e.like).steps; return base.map((s, i) => ({ cap: (e.caps && e.caps[i]) || s.cap, pose: s.pose })); };
   const CREDIT = 'Muscle map: body-highlighter (MIT)';
 
-  const api = { LIST, byKey, find, stepsOf, muscleMapSvg, poseSvg, CREDIT };
+  // animated mannequin: moves pose 1 → 2 → 3, holds, and back (SMIL: offline, no script). Every pose of an
+  // exercise has the same parts and gear in the same order, so each shape just changes its numbers.
+  const esc = s => String(s).replace(/[&<"]/g, c => ({ '&': '&amp;', '<': '&lt;', '"': '&quot;' })[c]);
+  function animSvg(e, label) {
+    const poses = stepsOf(e).map(s => s.pose), seq = [0, 1, 2, 2, 1, 0];
+    const timing = `dur="3.2s" repeatCount="indefinite" keyTimes="0;0.25;0.45;0.55;0.75;1" calcMode="spline" keySplines="${Array(5).fill('0.4 0 0.6 1').join(';')}"`;
+    const el = (tag, fixed, attrs) => `<${tag} ${fixed} ${Object.entries(attrs).map(([k, v]) => `${k}="${v[0]}"`).join(' ')}>`
+      + Object.entries(attrs).filter(([, v]) => v.some(x => x !== v[0])).map(([k, v]) => `<animate attributeName="${k}" values="${seq.map(i => v[i]).join(';')}" ${timing}/>`).join('')
+      + `</${tag}>`;
+    const all = f => poses.map(f);
+    const line = (fixed, pts) => el('polyline', `fill="none" ${fixed} stroke-linecap="round" stroke-linejoin="round"`, { points: pts });
+    const gear = poses[0].gear.map((g, i) => (g.circle ? el('circle', `fill="none" stroke="${C.gear}" stroke-width="${g.w || 4}"`,
+      { cx: all(p => p.gear[i].circle[0]), cy: all(p => p.gear[i].circle[1]), r: all(p => p.gear[i].circle[2]) })
+      : g.rect ? el('rect', `rx="2" fill="${C.gear}"`, { x: all(p => p.gear[i].rect[0]), y: all(p => p.gear[i].rect[1]), width: all(p => p.gear[i].rect[2]), height: all(p => p.gear[i].rect[3]) })
+      : line(`stroke="${C.gear}" stroke-width="${g.w || 2}"`, all(p => p.gear[i].line)))).join('');
+    const body = poses[0].parts.map((q, i) => { const pts = all(p => p.parts[i].p);
+      return line(`stroke="${C.edge}" stroke-width="${q.w + 3}"`, pts) + line(`stroke="${C[q.c] || C.body}" stroke-width="${q.w}"`, pts); }).join('');
+    const head = el('circle', `r="9" fill="${C.body}" stroke="${C.edge}" stroke-width="1.5"`, { cx: all(p => p.head[0]), cy: all(p => p.head[1]) });
+    return `<svg viewBox="0 0 120 140" class="pose" role="img" aria-label="${esc(label)}"><rect width="120" height="140" rx="10" fill="${C.edge}"/>`
+      + `<line x1="8" y1="133" x2="112" y2="133" stroke="#2a2f38" stroke-width="2"/>${gear}${body}${head}</svg>`;
+  }
+
+  const api = { LIST, GROUPS, byKey, find, stepsOf, muscleMapSvg, animSvg, CREDIT };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.OlyxExercises = api;
 })(this);

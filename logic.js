@@ -121,13 +121,16 @@
 
   // ---- training style: the user's own scale from strength to hypertrophy (Balanced = where most people train) ----
   const STYLES = [
-    { label: 'Strength', reps: '4–8', rest: '5 min', sets: '3', restMin: 5, setsN: 3, firstRows: 3 },
-    { label: '', reps: '5–9', rest: '4 min', sets: '3', restMin: 4, setsN: 3, firstRows: 3 },
-    { label: 'Balanced', reps: '6–10', rest: '3 min', sets: '2', restMin: 3, setsN: 2, firstRows: 2 },
-    { label: '', reps: '7–11', rest: '2–3 min', sets: '2', restMin: 2.5, setsN: 2, firstRows: 2 },
-    { label: 'Hypertrophy', reps: '8–12', rest: '2–3 min', sets: '1–2', restMin: 2.5, setsN: 2, firstRows: 2 },
+    { label: 'Strength', reps: '4–8', rest: '5 min', sets: '3', restMin: 5, setsN: 3 },
+    { label: '', reps: '5–9', rest: '4 min', sets: '3', restMin: 4, setsN: 3 },
+    { label: 'Balanced', reps: '6–10', rest: '3 min', sets: '2', restMin: 3, setsN: 2 },
+    { label: '', reps: '7–11', rest: '2–3 min', sets: '2', restMin: 2.5, setsN: 2 },
+    { label: 'Hypertrophy', reps: '8–12', rest: '2–3 min', sets: '1–2', restMin: 2.5, setsN: 2 },
   ];
   const styleOf = data => STYLES[data.gym && Number.isInteger(data.gym.style) ? data.gym.style : 2];
+  // per exercise in a workout: working sets 1–8, warm-ups 0–4; older items (no or bad numbers) = 3 / 0
+  const count = (x, lo, hi, d) => (Number.isInteger(x) && x >= lo && x <= hi ? x : d);
+  const planOf = i => ({ sets: count(i && i.sets, 1, 8, 3), warm: count(i && i.warm, 0, 4, 0) });
 
   // ---- split helper: proven splits, no AI, no reps. Library keys (exercises.js has names and pictures). ----
   const SPLIT_KEYS = {
@@ -167,7 +170,8 @@
         const k = SPLIT_KEYS[SPLIT_TYPE[name]];
         const comp = name === 'Full body B' ? [...k.compound.slice(3), ...k.compound.slice(0, 3)] : k.compound;
         const order = style <= 1 ? [...comp, ...k.isolation] : [...comp.slice(0, 2), ...k.isolation, ...comp.slice(2)];
-        t = { name, days: [], items: order.slice(0, n).map(lib => ({ lib })) };
+        // the style's working sets; 2 warm-ups on the first two compound lifts
+        t = { name, days: [], style, items: order.slice(0, n).map((lib, j) => ({ lib, sets: st.setsN, warm: j < 2 ? 2 : 0 })) };
         out.push(t);
       }
       t.days.push(days[i]);
@@ -178,8 +182,12 @@
   function applySplit(data, split, today, now = Date.now(), nameOf = k => k) {
     const g = gymOf(data);
     for (const t of [...g.templates]) deleteGym(data, 'templates', t.id, now);
-    for (const t of split) g.templates.push({ id: newId(), name: t.name, days: [...t.days],
-      items: t.items.map(i => ({ ex: ensureExercise(data, nameOf(i.lib), now, i.lib) })), updated: now });
+    for (const t of split) {
+      const tpl = { id: newId(), name: t.name, days: [...t.days], updated: now,
+        items: t.items.map(i => ({ ex: ensureExercise(data, nameOf(i.lib), now, i.lib), ...planOf(i) })) };
+      if (Number.isInteger(t.style)) tpl.style = t.style; // helper workouts keep their style (the hint line)
+      g.templates.push(tpl);
+    }
     if (Number.isInteger(split.style)) g.style = split.style;
     return { habit: linkWorkoutHabit(data, today, now) };
   }
@@ -205,7 +213,7 @@
     } else if (cur && cur.days.length === 1) { tpl = cur; tpl.name = n; tpl.updated = now; }
     else {
       if (cur) off(cur);
-      tpl = { id: newId(), name: n, days: [day], items: cur ? cur.items.map(i => ({ ex: i.ex })) : [], updated: now };
+      tpl = { id: newId(), name: n, days: [day], items: cur ? cur.items.map(i => ({ ex: i.ex, ...planOf(i) })) : [], updated: now };
       g.templates.push(tpl);
     }
     linkWorkoutHabit(data, dayKey(new Date(now)), now); // a new Workout habit starts today
@@ -245,16 +253,32 @@
       return o;
     });
   }
-  // last time's rows (warm-ups kept), else the training style's working rows, empty (reps 0 = not filled in)
-  function prefillSets(data, exId) {
-    const last = lastSets(data, exId);
-    return last && last.length ? last.map(s => ({ ...s, done: false })) : Array.from({ length: styleOf(data).firstRows }, () => ({ reps: 0, done: false }));
+  // the n-th row (0-based) of a kind, prefilled from last time's n-th row of that kind; reps 0 = not filled in
+  function prefillRow(data, exId, warm, n, excludeId) {
+    const last = (lastSets(data, exId, excludeId) || []).filter(s => !!s.warm === warm)[n];
+    const row = last ? { ...last, done: false } : { reps: 0, done: false };
+    if (warm) row.warm = true;
+    return row;
+  }
+  // a workout exercise starts with one working set; its plan says how many set / warm-up chips it gets.
+  // Added mid-workout (no template): 3 sets, 2 warm-ups.
+  const workoutItem = (data, exId, plan = { sets: 3, warm: 2 }) => ({ ex: exId, plan, sets: [prefillRow(data, exId, false, 0)] });
+  // a chip: give exercise idx n rows of a kind (warm-ups on top, at least 1 working set). Removes only undone rows, from the end.
+  function setRowCount(data, w, idx, warm, n, now = Date.now()) {
+    const it = w.items[idx];
+    if (!it) return;
+    const rows = it.sets.filter(s => !!s.warm === warm), other = it.sets.filter(s => !!s.warm !== warm);
+    n = Math.max(warm ? 0 : 1, n);
+    while (rows.length < n) rows.push(prefillRow(data, it.ex, warm, rows.length, w.id));
+    while (rows.length > n && !rows[rows.length - 1].done) rows.pop();
+    it.sets = warm ? [...rows, ...other] : [...other, ...rows];
+    w.updated = now;
   }
   function startWorkout(data, day, tplId, now = Date.now()) {
     const g = gymOf(data), draft = g.workouts.find(w => !w.done);
     if (draft) return draft;
     const tpl = g.templates.find(t => t.id === tplId);
-    const w = { id: newId(), day, items: tpl ? tpl.items.map(i => ({ ex: i.ex, sets: prefillSets(data, i.ex) })) : [], done: false, updated: now };
+    const w = { id: newId(), day, items: tpl ? tpl.items.map(i => workoutItem(data, i.ex, planOf(i))) : [], done: false, updated: now };
     if (tpl) w.tpl = tpl.id;
     g.workouts.push(w);
     return w;
@@ -512,7 +536,7 @@
     return out;
   }
 
-  const api = { gymOf, mergeGym, deleteGym, STYLES, styleOf, SPLIT_KEYS, suggestSplit, applySplit, ensureExercise, setDayWorkout, linkWorkoutHabit, todayTemplate, lastSets, prefillSets, startWorkout, bestKg, finishWorkout, exerciseHistory, reminderText, reminderPlan, REMIND_HOURS, dayKey, addDays, weekStart, dow, isScheduled, isDone, isPaused, toggle, togglePause, merge, deleteHabit, weekCount, isDue, dayScore, isPerfect, perfectStreak,
+  const api = { gymOf, mergeGym, deleteGym, STYLES, styleOf, SPLIT_KEYS, suggestSplit, applySplit, ensureExercise, setDayWorkout, linkWorkoutHabit, todayTemplate, lastSets, planOf, workoutItem, setRowCount, startWorkout, bestKg, finishWorkout, exerciseHistory, reminderText, reminderPlan, REMIND_HOURS, dayKey, addDays, weekStart, dow, isScheduled, isDone, isPaused, toggle, togglePause, merge, deleteHabit, weekCount, isDue, dayScore, isPerfect, perfectStreak,
     streak, bestStreak, percent, percentBetween, monthStats, cellStatus, weakDay, validate, newId, defaultData };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.HabitLogic = api;
