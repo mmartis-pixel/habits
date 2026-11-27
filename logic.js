@@ -111,6 +111,8 @@
   function deleteGym(data, list, id, now = Date.now()) {
     const g = gymOf(data);
     g[list] = g[list].filter(x => x.id !== id);
+    // a deleted workout takes its unfinished draft with it (finished history stays)
+    if (list === 'templates') g.workouts = g.workouts.filter(w => w.done || w.tpl !== id);
     if (list === 'exercises') for (const t of g.templates) {
       if (t.items.some(i => i.ex === id)) { t.items = t.items.filter(i => i.ex !== id); t.updated = now; }
     }

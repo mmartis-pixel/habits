@@ -529,6 +529,20 @@ assert.notStrictEqual(L.newId(), L.newId());
   g.gym.style = 2; g.gym.workouts[0].items[0].sets[0].warm = 'yes'; assert.ok(!L.validate(g));
 }
 
+// --- gym: deleting a workout drops its unfinished draft (a new split must not reopen the old workout) ---
+{
+  const d = Object.assign(data([daily()]), { gym: { exercises: [{ id: 'e1', name: 'Bench press', updated: 1 }],
+    templates: [{ id: 't1', name: 'Old', days: [3], items: [{ ex: 'e1' }], updated: 1 }], workouts: [] } });
+  const draft = L.startWorkout(d, T, 't1', 5);
+  const done = { id: 'w0', day: '2026-11-12', tpl: 't1', items: [], done: true, updated: 1 };
+  d.gym.workouts.push(done);
+  L.applySplit(d, L.suggestSplit({ perWeek: 3, minutes: 60, style: 2 }), T, 9);
+  assert.ok(!d.gym.workouts.some(w => w.id === draft.id));          // unfinished workout of the replaced split is gone
+  assert.ok(d.gym.workouts.some(w => w.id === 'w0'));               // history stays
+  const nd = L.startWorkout(d, T, d.gym.templates[0].id, 10);
+  assert.notStrictEqual(nd.id, draft.id);
+}
+
 // --- exercise library (exercises.js) ---
 {
   const EX = require('./exercises.js');
