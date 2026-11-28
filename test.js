@@ -381,12 +381,12 @@ assert.notStrictEqual(L.newId(), L.newId());
   assert.deepStrictEqual(s.map(t => t.name), ['Push', 'Pull', 'Legs']);
   assert.deepStrictEqual(s.map(t => t.days), [[0], [2], [4]]);
   assert.ok(s.every(t => t.items.length === 5 && t.items.every(i => Object.keys(i).join() === 'lib,sets,warm')));
-  assert.deepStrictEqual(keys(s[0]).slice(0, 3), ['machine-chest-press', 'incline-dumbbell-press', 'lateral-raise']);
+  assert.deepStrictEqual(keys(s[0]).slice(0, 3), ['machine-chest-press', 'incline-dumbbell-press', 'dumbbell-shoulder-press']); // multi-joint first
   s = L.suggestSplit({ perWeek: 3, daysOff: [0], minutes: 60, style: 2 });
   assert.deepStrictEqual(s.flatMap(t => t.days).sort(), [1, 2, 4]);                        // Monday off → Tue/Wed/Fri
   s = L.suggestSplit({ perWeek: 3, minutes: 60, style: 0 });
   assert.ok(s.every(t => t.items.length === 3));
-  assert.deepStrictEqual(keys(s[0]), ['machine-chest-press', 'incline-dumbbell-press', 'dumbbell-shoulder-press']);
+  assert.deepStrictEqual(keys(s[0]), ['machine-chest-press', 'incline-dumbbell-press', 'lateral-raise']); // strength: 2/3 multi-joint
   assert.strictEqual(L.suggestSplit({ perWeek: 3, minutes: 60, style: 4 })[0].items.length, 6);
   assert.deepStrictEqual(L.suggestSplit({ perWeek: 6, daysOff: [0, 1], minutes: 60, style: 2 }), []);
   s = L.suggestSplit({ perWeek: 4, minutes: 60, style: 2 });
@@ -551,7 +551,7 @@ assert.notStrictEqual(L.newId(), L.newId());
 {
   const s = L.suggestSplit({ perWeek: 3, minutes: 60, style: 0 });
   // the helper decides: strength compound 3 warm-ups + 3 sets, isolation 1 + 2; balanced/hypertrophy compound 2 + 2, isolation 1 + 2
-  assert.deepStrictEqual(s[0].items.map(i => [i.sets, i.warm]), [[3, 3], [3, 3], [3, 3]]); // 60 min of strength = 3 compound lifts
+  assert.deepStrictEqual(s[0].items.map(i => [i.sets, i.warm]), [[3, 3], [3, 3], [2, 1]]); // 60 min of strength = 2 compound lifts + 1 isolation
   assert.deepStrictEqual(L.helperPlan(4, true), { sets: 2, warm: 2 });
   assert.deepStrictEqual(L.helperPlan(2, false), { sets: 2, warm: 1 });
   assert.strictEqual(s[0].style, 0);
@@ -636,10 +636,11 @@ assert.notStrictEqual(L.newId(), L.newId());
   assert.strictEqual(EX.find('nope'), null);
   const map = EX.muscleMapSvg(['CHEST'], ['TRICEPS']);
   assert.ok(map.includes('#E24B4A') && map.includes('#F09595') && map.split('<svg').length === 3);
-  // v3: subgroups of 5-10, and every pose of an exercise has the same shapes (the animation morphs them)
+  // the user's numbers per muscle (2026-11-28), and every pose of an exercise has the same shapes (the animation morphs them)
+  const WANT = { Chest: 7, Lats: 5, 'Upper back': 5, 'Lower back': 3, Shoulders: 6, Biceps: 6, Triceps: 6, Forearms: 4, Quads: 5, Hamstrings: 4, Glutes: 4, Calves: 4, Abs: 6, Obliques: 4 };
   for (const g of EX.GROUPS) for (const sub of g.subs || [g.name]) {
     const n = EX.LIST.filter(e => e.group === g.name && (!g.subs || e.sub === sub)).length;
-    assert.ok(n >= 5 && n <= 10, sub + ' has ' + n);
+    assert.strictEqual(n, WANT[sub], sub);
   }
   assert.ok(EX.LIST.every(e => !!e.sub === !!EX.GROUPS.find(g => g.name === e.group).subs), 'sub missing');
   const shape = p => JSON.stringify([p.parts.map(q => q.p.split(' ').length + q.c), p.gear.map(g => Object.keys(g).join() + (g.line ? g.line.split(' ').length : ''))]);
