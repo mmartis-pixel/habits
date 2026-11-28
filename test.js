@@ -604,6 +604,11 @@ assert.notStrictEqual(L.newId(), L.newId());
   assert.deepStrictEqual(L.suggestSplit({ type: 'ppl', perWeek: 4, minutes: 60 }), []);              // PPL is 3 or 6 a week
   for (const [k, T] of Object.entries(L.SPLIT_TYPES)) for (const n of Object.keys(T.seq))
     assert.ok(L.suggestSplit({ type: k, perWeek: Number(n), minutes: 60 }).every(t => t.items.length >= 3), k + n);
+  // the helper offers at most 3 splits per times a week, each works for that number and has an "about"
+  for (const [n, keys] of Object.entries(L.SPLIT_OPTIONS)) {
+    assert.ok(keys.length >= 1 && keys.length <= 3 && keys.includes(L.DEFAULT_TYPE[n]), 'options ' + n);
+    for (const k of keys) assert.ok(L.SPLIT_TYPES[k].about && L.suggestSplit({ type: k, perWeek: Number(n), minutes: 60 }).length, k + n);
+  }
   const own = L.suggestSplit({ type: 'ul', perWeek: 4, minutes: 60, own: true });
   assert.deepStrictEqual(own, [{ name: 'Upper', days: [0, 3], items: [] }, { name: 'Lower', days: [1, 4], items: [] }]); // no style: My week asks sets
   const d = data([daily()]);

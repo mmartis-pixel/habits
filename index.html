@@ -288,6 +288,11 @@
   .pdots .pm-d.on { color: var(--bg); }
   .pflex { font-size: .8rem; font-weight: 600; color: var(--accent); padding: 5px 12px; border-radius: 999px; border: 1px solid rgb(52 211 153 / .4); }
   #hform .ideas { margin: 0 0 4px; }
+  .pstart { margin: 14px 0; padding: 16px; border-radius: 16px; border: 1px solid rgb(52 211 153 / .35); background: var(--card); max-width: 560px; }
+  .pstart h2 { margin: 0 0 4px; } .pstart p { margin: 0 0 12px; }
+  .pbasics { display: grid; gap: 8px; margin-bottom: 12px; } .pbasics .idea { width: 100%; padding: 12px 14px; font-size: 1rem; }
+  .precs { margin: 18px 0; max-width: 560px; } .precs > b { display: block; font-size: .85rem; color: var(--muted); margin-bottom: 8px; }
+  .precs > div { display: flex; flex-wrap: wrap; gap: 6px; }
   .ideas { margin: 10px 0 14px; padding: 12px; border-radius: 14px; border: 1px dashed rgb(52 211 153 / .4); }
   .ideas > b { display: block; font-size: .85rem; margin-bottom: 8px; }
   .ideas > div { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -475,6 +480,14 @@
   .gcl { display: flex; justify-content: space-between; font-size: .75rem; color: var(--muted); margin-top: 4px; }
   .gstyle { margin-bottom: 12px; } .gstyle input[type=range] { width: 100%; accent-color: var(--accent); padding: 0; }
   .gsl { display: flex; justify-content: space-between; font-size: .75rem; color: var(--muted); }
+  .gq { margin: 18px 0 8px; font-weight: 700; font-size: .95rem; color: var(--text); } .gq .muted { font-weight: 400; font-size: .85rem; }
+  .gopts { display: grid; gap: 8px; margin-bottom: 14px; }
+  .gopt { display: flex; flex-direction: column; gap: 3px; text-align: left; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--card); color: var(--text); }
+  .gopt b { font-size: .95rem; } .gopt span { font-size: .8rem; color: var(--muted); line-height: 1.35; } .gopt em { font-style: normal; font-size: .75rem; color: var(--accent); }
+  .gopt.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .gauto { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; font-size: .85rem; } .gauto input { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }
+  .gstyle input[type=range]:disabled { opacity: .4; }
+  .gexl { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; } .gexl li { display: flex; justify-content: space-between; gap: 8px; font-size: .85rem; }
   .ghint { margin: 4px 0 0; font-size: .85rem; color: var(--text); }
   .gweek { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
   .gwd { display: grid; gap: 2px; padding: 8px 0; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
@@ -947,10 +960,20 @@ function renderPlan() {
         data-act="pday" data-id="${esc(h.id)}" data-d="${i}" aria-pressed="${onDay(h, i)}" aria-label="${esc(h.name)} on ${FULL[i]}">${d[0]}</button>`).join('')}</div>`}
     </div>`;
   };
+  // our recommended habits stay on the page: the 3 basics first ("Add all 3"), the rest as one-tap chips
+  const taken = new Set(data.habits.map(h => h.name.toLowerCase()));
+  const idea = i => { const [name, note] = SUGGEST[i]; return `<button class="idea" data-act="suggest" data-i="${i}">+ ${esc(name)}${note ? `<span>${esc(note)}</span>` : ''}</button>`; };
+  const left = SUGGEST.map((_, i) => i).filter(i => !taken.has(SUGGEST[i][0].toLowerCase())), basics = left.filter(i => i < 3), more = left.filter(i => i >= 3);
+  const recommended = !left.length ? '' : order.length ? `<div class="precs"><b>Recommended</b><div>${left.map(idea).join('')}</div></div>`
+    : `<div class="pstart"><h2>Start with the basics</h2><p class="muted">What almost everyone tracks. Tap one, or add all three.</p>
+      <div class="pbasics">${basics.map(idea).join('')}</div>
+      ${basics.length > 1 ? `<button class="btn primary" data-act="suggest3">Add all ${basics.length}</button>` : ''}</div>
+      ${more.length ? `<div class="precs"><b>More ideas</b><div>${more.map(idea).join('')}</div></div>` : ''}`;
   return `
     <div class="ptop"><h1 class="title">Weekly plan</h1><button class="btn primary" data-act="new" data-col="any">+ Add</button></div>
-    ${order.length ? `<div class="plist">${order.map(row).join('')}</div>`
-      : `<p class="muted">No habits yet. Tap <b>+ Add</b> to pick one of the ideas or make your own.</p>`}
+    ${order.length ? `<div class="plist">${order.map(row).join('')}</div>` : ''}
+    ${recommended}
+    ${!order.length && !left.length ? `<p class="muted">No habits yet. Tap <b>+ Add</b> to make your own.</p>` : ''}
     ${archived.length ? `<h2>Archived (history kept)</h2>${archived.map(h => `<div class="row">
       <span class="txt"><span class="name">${esc(h.name)}</span><span class="note">${esc(freqText(h.freq))}</span></span>
       <button data-act="archive" data-id="${esc(h.id)}">Restore</button>
@@ -1043,25 +1066,54 @@ function renderGym() {
       <span class="muted">${w.items.length} exercise${w.items.length === 1 ? '' : 's'} · ${doneSets(w)} sets</span></button></li>`).join('')}</ul>` : '<p class="muted">No workouts yet.</p>'}`;
 }
 
+// split helper, step by step (the user's flow): times a week + rest days → "Suggest split" → pick one (or "Choose for me")
+// → "Suggest exercises" (style + session length → Generate → full preview → Use) or "I have my own" (empty workouts → My week)
+const helperType = s => (s.type === 'auto' ? L.DEFAULT_TYPE[s.perWeek] : s.type);
+const helperSplit = (s, own) => L.suggestSplit({ type: helperType(s), perWeek: s.perWeek, daysOff: s.off, minutes: s.minutes, style: s.style, own });
+// short: reps, working sets, warm-up range (no rest times, no per-lift detail)
+const shortHint = i => { const st = L.STYLES[i], w = [L.helperPlan(i, false).warm, L.helperPlan(i, true).warm];
+  return `${st.reps} reps · ${st.sets} sets · ${w[0] === w[1] ? w[0] : w.join('–')} warm-up sets`; };
 function helperSheet() {
-  const s = gymSheet;
-  s.preview = L.suggestSplit({ type: s.type, perWeek: s.perWeek, daysOff: s.off, minutes: s.minutes, style: s.style, own: s.own });
-  const T = L.SPLIT_TYPES[s.type], plan = p => `${p.warm} warm-up${p.warm === 1 ? '' : 's'} + ${p.sets} sets`;
-  return gymWrap('Suggest a split', `
-    <p class="muted">Split</p><div class="gchips">${Object.entries(L.SPLIT_TYPES).map(([k, t]) =>
-      `<button class="gchip${k === s.type ? ' on' : ''}" data-act="g-htype" data-v="${k}" aria-pressed="${k === s.type}">${esc(t.name)}</button>`).join('')}</div>
-    <p class="muted">How many times a week?</p>${seg('g-hper', s.perWeek, Object.keys(T.seq).map(n => [Number(n), n]))}
-    <p class="muted">Days off (optional)</p>${dayChips('g-hoff', s.off)}
-    <p class="muted">Exercises</p>${seg('g-hown', s.own ? 1 : 0, [[0, 'Suggest exercises'], [1, 'I have my own']])}
-    ${s.own ? '' : `<p class="muted">How long is a session?</p>${seg('g-hmin', s.minutes, [[45, '45 min'], [60, '60 min'], [90, '90 min']])}
-    <div class="gstyle"><div class="gsl"><span>Strength</span><span>Training style</span><span>Hypertrophy</span></div>
-      <input type="range" min="0" max="4" step="1" value="${s.style}" data-g="hstyle" aria-label="Training style, strength to hypertrophy">
-      <p class="muted ghint">${styleHint(L.STYLES[s.style])}</p>
-      <p class="muted ghint">Multi-joint lifts: ${plan(L.helperPlan(s.style, true))} · isolation: ${plan(L.helperPlan(s.style, false))}</p></div>`}
-    ${s.preview.length ? `<div class="gprev">${s.preview.map(p => `<div class="card"><b>${esc(p.name)}</b> <span class="muted">${dayList(p.days)}</span>
-      <p class="muted">${p.items.length ? p.items.map(i => esc(EX.byKey(i.lib).name)).join(', ') : 'You add the exercises in My week'}</p></div>`).join('')}</div>
-      <button class="btn primary" data-act="g-happly">Use this split</button>`
-    : '<p class="muted">Not enough free days. Pick fewer days off or train fewer times a week.</p>'}`);
+  const s = gymSheet, days = k => L.suggestSplit({ type: k, perWeek: s.perWeek, daysOff: s.off, own: true });
+  const opt = (act, v, on, title, about, extra = '') => `<button class="gopt${on ? ' on' : ''}" data-act="${act}" data-v="${v}" aria-pressed="${on}">
+    <b>${esc(title)}</b><span>${esc(about)}</span>${extra}</button>`;
+  let body = `<p class="gq">How many times a week?</p>${seg('g-hper', s.perWeek, [2, 3, 4, 5, 6].map(n => [n, String(n)]))}
+    <p class="gq">Rest days <span class="muted">(optional)</span></p>${dayChips('g-hoff', s.off)}
+    ${s.shown ? '' : '<button class="btn primary" data-act="g-hsuggest">Suggest split</button>'}`;
+  if (!s.shown) return gymWrap('Suggest a split', body);
+  const fits = L.SPLIT_OPTIONS[s.perWeek].filter(k => days(k).length);
+  if (!fits.length) return gymWrap('Suggest a split', body + '<p class="muted">Not enough free days. Pick fewer rest days or train fewer times a week.</p>');
+  body += `<p class="gq">Pick a split</p><div class="gopts">${fits.map(k => opt('g-htype', k, s.type === k, L.SPLIT_TYPES[k].name, L.SPLIT_TYPES[k].about,
+      `<em>${days(k).map(w => `${esc(w.name)}: ${dayList(w.days)}`).join(' · ')}</em>`)).join('')}
+    ${opt('g-htype', 'auto', s.type === 'auto', 'Choose for me', `We'll go with ${L.SPLIT_TYPES[L.DEFAULT_TYPE[s.perWeek]].name}.`)}</div>`;
+  if (!s.type) return gymWrap('Suggest a split', body);
+  body += `<p class="gq">Exercises</p><div class="gopts">
+    ${opt('g-hmode', 'gen', s.mode === 'gen', 'Suggest exercises', 'We pick well-known exercises that are easy to learn. Not every one will suit you; swap any of them later in My week.')}
+    ${opt('g-hmode', 'own', false, 'I have my own', 'We set up your training days. You add your exercises, sets and warm-ups in My week.')}</div>`;
+  if (s.mode !== 'gen') return gymWrap('Suggest a split', body);
+  body += `<div class="gstyle"><p class="gq">Training style</p>
+      <input type="range" min="0" max="4" step="1" value="${s.style}" data-g="hstyle" aria-label="Training style, strength to hypertrophy"${s.auto ? ' disabled' : ''}>
+      <div class="gsl"><span>Strength</span><span>Hypertrophy</span></div>
+      <label class="gauto"><input type="checkbox" data-g="hauto"${s.auto ? ' checked' : ''}> Leave it to OLYX</label>
+      <p class="ghint">${shortHint(s.style)}</p></div>
+    <p class="gq">How long is a session?</p>${seg('g-hmin', s.minutes, [[45, '45 min'], [60, '60 min'], [90, '90 min']])}
+    ${s.generated ? '' : '<button class="btn primary" data-act="g-hgen">Generate</button>'}`;
+  if (!s.generated) return gymWrap('Suggest a split', body);
+  const plan = i => `${i.warm} warm-up${i.warm === 1 ? '' : 's'} + ${i.sets} set${i.sets === 1 ? '' : 's'}`;
+  body += `<p class="gq">Your split</p><div class="gprev">${helperSplit(s, false).map(p => `<div class="card"><b>${esc(p.name)}</b> <span class="muted">${dayList(p.days)}</span>
+      <ul class="gexl">${p.items.map(i => `<li><span>${esc(EX.byKey(i.lib).name)}</span><span class="muted">${plan(i)}</span></li>`).join('')}</ul></div>`).join('')}</div>
+    <button class="btn primary" data-act="g-happly">Use this split</button>`;
+  return gymWrap('Suggest a split', body);
+}
+// save the helper's split (own = empty workouts) and go to My week
+function helperApply(s, own) {
+  const split = helperSplit(s, own);
+  if (!split.length) return false;
+  if (G().templates.length && !confirm('Replace your current split? Past workouts stay.')) return false;
+  const { habit } = L.applySplit(data, own ? split : Object.assign(split, { style: s.style }), today(), Date.now(), k => EX.byKey(k).name);
+  save(); gymSheet = { kind: 'week', day: split[0].days[0] }; Sfx.play('pop');
+  toast('Split saved', `Workout habit: ${habit.freq.kind === 'daily' ? 'every day' : dayList(habit.freq.days)}`);
+  return true;
 }
 
 // My week: weekday chips on top, the chosen day's workout below. A name picked from the list shares that workout.
@@ -1152,20 +1204,16 @@ function gymAction(b) {
   const flip = (arr, x) => arr.includes(x) ? arr.filter(y => y !== x) : [...arr, x].sort((p, q) => p - q);
   switch (b.dataset.act) {
     case 'g-close': gymSheet = (gymSheet && gymSheet.from) || null; break; // exercise detail returns to where it was opened
-    case 'g-helper': gymSheet = { kind: 'helper', type: 'ppl', perWeek: 3, off: [], minutes: 60, own: false, style: Number.isInteger(G().style) ? G().style : 2 }; Sfx.play('soft'); break;
-    case 'g-htype': { s.type = v; const ns = Object.keys(L.SPLIT_TYPES[v].seq).map(Number); if (!ns.includes(s.perWeek)) s.perWeek = ns[0]; break; }
-    case 'g-hown': s.own = v === '1'; break;
-    case 'g-hper': s.perWeek = Number(v); break;
-    case 'g-hoff': s.off = flip(s.off, Number(v)); break;
-    case 'g-hmin': s.minutes = Number(v); break;
-    case 'g-happly': {
-      if (!s.preview) return;
-      if (G().templates.length && !confirm('Replace your current split? Past workouts stay.')) return;
-      const { habit } = L.applySplit(data, Object.assign(s.preview, { style: s.style }), today(), now, k => EX.byKey(k).name);
-      save(); gymSheet = { kind: 'week', day: s.preview[0].days[0] }; Sfx.play('pop'); // straight to My week to adjust
-      toast('Split saved', `Workout habit: ${habit.freq.kind === 'daily' ? 'every day' : dayList(habit.freq.days)}`);
-      break;
-    }
+    case 'g-helper': gymSheet = { kind: 'helper', perWeek: 3, off: [], shown: false, type: null, mode: null, minutes: 60, auto: false, generated: false,
+      style: Number.isInteger(G().style) ? G().style : 2 }; Sfx.play('soft'); break;
+    case 'g-hper': s.perWeek = Number(v); s.type = null; s.mode = null; s.generated = false; break;
+    case 'g-hoff': s.off = flip(s.off, Number(v)); s.generated = false; break;
+    case 'g-hsuggest': s.shown = true; break;
+    case 'g-htype': s.type = v; s.generated = false; break;
+    case 'g-hmode': if (v === 'own') { if (!helperApply(s, true)) return; } else s.mode = 'gen'; break;
+    case 'g-hmin': s.minutes = Number(v); s.generated = false; break;
+    case 'g-hgen': s.generated = true; Sfx.play('soft'); break;
+    case 'g-happly': if (!helperApply(s, false)) return; break;
     case 'g-tpl': { // Create your own / a split row → My week on that workout's first day (or today)
       const p = G().templates.find(x => x.id === b.dataset.id);
       gymSheet = { kind: 'week', day: p && p.days.length ? p.days[0] : L.dow(today()) };
@@ -1216,7 +1264,10 @@ function gymAction(b) {
 document.addEventListener('change', ev => {
   const g = ev.target.dataset && ev.target.dataset.g;
   if (g === 'wname' && gymSheet && gymSheet.kind === 'week') setWeekDay(ev.target.value);
-  if (g === 'hstyle' && gymSheet && gymSheet.kind === 'helper') render(); // the preview depends on the style
+  if (g === 'hstyle' && gymSheet && gymSheet.kind === 'helper') { gymSheet.generated = false; render(); } // a new style needs Generate again
+  if (g === 'hauto' && gymSheet && gymSheet.kind === 'helper') { // "Leave it to OLYX": the middle, leaning a little to hypertrophy
+    gymSheet.auto = ev.target.checked; if (gymSheet.auto) gymSheet.style = 3; gymSheet.generated = false; render();
+  }
   if ((g === 'wsets' || g === 'wwarm') && gymSheet && gymSheet.kind === 'week') { // sets / warm-ups of one exercise in this workout
     const t = G().templates.find(x => x.days.includes(gymSheet.day)), it = t && t.items[Number(ev.target.dataset.k)];
     if (it) { it[g === 'wsets' ? 'sets' : 'warm'] = Number(ev.target.value); t.updated = Date.now(); save(); }
@@ -1232,7 +1283,7 @@ document.addEventListener('input', ev => {
   if (!f || !gymSheet) return;
   const k = Number(el.dataset.k);
   if (f === 'libq') { gymSheet.q = el.value; document.getElementById('glib').innerHTML = libRows(); }
-  else if (f === 'hstyle') { gymSheet.style = Number(el.value); el.parentNode.querySelector('.ghint').textContent = styleHint(L.STYLES[gymSheet.style]); }
+  else if (f === 'hstyle') { gymSheet.style = Number(el.value); el.parentNode.querySelector('.ghint').textContent = shortHint(gymSheet.style); }
   else if (f === 'libown') gymSheet.own = el.value;
   else if (f === 'wkg' || f === 'wreps') workoutInput(el, f);
 });
@@ -1797,8 +1848,10 @@ async function shareImage(kind) {
 
 // ---- onboarding (first run only): just a welcome; habit ideas live in Plan ----
 // starter ideas shown in Plan while there are fewer than 5 habits; tap = added (no jumping around)
-const SUGGEST = [['Morning routine', 'Up at 6, water right away, skin care'], ['Steps', '10,000 a day'],
-  ['Workout', ''], ['Sleep', '7–8 h'], ['Diet', '']];
+// recommended habits; the first 3 are the basics almost everyone does (Plan offers "Add all 3")
+const SUGGEST = [['Steps', '10,000 a day'], ['Sleep', '7+ hours'], ['Water', '2 litres a day'],
+  ['Morning routine', 'Up at 6, water right away, skin care'], ['Workout', ''], ['Read', '10 pages'], ['Stretch', '10 min'],
+  ['Meditate', '5 min'], ['No phone in bed', ''], ['Diet', '']];
 const LOGO = '<svg class="logo" viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="lg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6ee7b7"/><stop offset="1" stop-color="#10b981"/></linearGradient></defs>'
   + '<path d="M60.7 18.8A33 33 0 1 0 81.2 39.3" fill="none" stroke="url(#lg1)" stroke-width="9.7" stroke-linecap="round"/><circle cx="73.3" cy="26.7" r="7" fill="#ecfdf5"/></svg>';
 let onboard = null; // { step, picked: ['pack:item', ...] }
@@ -2062,6 +2115,11 @@ document.addEventListener('click', ev => {
     } break;
     // onboarding
     case 'ob-next': finishOnboarding(); pickAsk(); break;
+    case 'suggest3': { // the basics not added yet, all at once
+      const taken = new Set(data.habits.map(x => x.name.toLowerCase()));
+      for (const [name, note] of SUGGEST.slice(0, 3)) if (!taken.has(name.toLowerCase()))
+        data.habits.push({ id: L.newId(), name, note, type: 'check', freq: { kind: 'daily' }, created: today(), archived: false, updated: Date.now() });
+      save(); Sfx.play('pop'); toast('Added', 'Steps, sleep and water, every day'); break; }
     case 'suggest': { const [name, note, f] = SUGGEST[Number(b.dataset.i)];
       data.habits.push({ id: L.newId(), name, note, type: 'check', freq: f || { kind: 'daily' }, created: today(), archived: false, updated: Date.now() });
       editing = null; save(); Sfx.play('pop'); toast('Added', name); break; }

@@ -159,6 +159,15 @@
     arnold: { name: 'Arnold split', seq: { 3: ARN, 6: [...ARN, ...ARN] } },
   };
   const DEFAULT_TYPE = { 2: 'fb', 3: 'ppl', 4: 'ul', 5: 'ulppl', 6: 'ppl' };
+  // what the helper offers for each number of sessions a week (at most 3, the usual pick first), with a one-line "about"
+  const SPLIT_OPTIONS = { 2: ['fb', 'ul', 'ap'], 3: ['fb', 'ppl', 'arnold'], 4: ['ul', 'ap', 'fbeod'], 5: ['ulppl'], 6: ['ppl', 'arnold'] };
+  Object.assign(SPLIT_TYPES.fb, { about: 'The whole body every session. Great for beginners. About 60 min.' });
+  Object.assign(SPLIT_TYPES.fbeod, { about: 'The whole body, always a rest day in between. About 60 min.' });
+  Object.assign(SPLIT_TYPES.ul, { about: 'Upper: chest, back, shoulders, arms. Lower: legs, glutes, core. About 60 min.' });
+  Object.assign(SPLIT_TYPES.ppl, { about: 'Push: chest, shoulders, triceps. Pull: back, biceps. Legs. About 60–75 min.' });
+  Object.assign(SPLIT_TYPES.ulppl, { about: 'Upper and lower, then push, pull and legs. About 60 min.' });
+  Object.assign(SPLIT_TYPES.ap, { about: 'Front: quads, chest, shoulders, biceps, abs. Back: hamstrings, glutes, back, triceps. About 60 min.' });
+  Object.assign(SPLIT_TYPES.arnold, { about: 'Chest and back, shoulders and arms, legs. Longer sessions, about 75 min.' });
   const SPLIT_TYPE = { 'Full body A': 'full', 'Full body B': 'full', Push: 'push', Pull: 'pull', Legs: 'legs', Upper: 'upper', Lower: 'lower',
     Anterior: 'anterior', Posterior: 'posterior', 'Chest & back': 'chestback', 'Shoulders & arms': 'shoulderarms' };
   const PREF_DAYS = { 2: [0, 3], 3: [0, 2, 4], 4: [0, 1, 3, 4], 5: [0, 1, 2, 3, 4], 6: [0, 1, 2, 3, 4, 5] };
@@ -574,7 +583,7 @@
     return out;
   }
 
-  const api = { gymOf, mergeGym, deleteGym, STYLES, styleOf, SPLIT_KEYS, suggestSplit, applySplit, ensureExercise, setDayWorkout, linkWorkoutHabit, todayTemplate, lastSets, planOf, helperPlan, SPLIT_TYPES, workoutItem, setRowCount, startWorkout, bestKg, finishWorkout, exerciseHistory, reminderText, reminderPlan, REMIND_HOURS, dayKey, addDays, weekStart, dow, isScheduled, isDone, isPaused, toggle, togglePause, merge, deleteHabit, weekCount, isDue, dayScore, isPerfect, perfectStreak,
+  const api = { gymOf, mergeGym, deleteGym, STYLES, styleOf, SPLIT_KEYS, suggestSplit, applySplit, ensureExercise, setDayWorkout, linkWorkoutHabit, todayTemplate, lastSets, planOf, helperPlan, SPLIT_TYPES, SPLIT_OPTIONS, DEFAULT_TYPE, workoutItem, setRowCount, startWorkout, bestKg, finishWorkout, exerciseHistory, reminderText, reminderPlan, REMIND_HOURS, dayKey, addDays, weekStart, dow, isScheduled, isDone, isPaused, toggle, togglePause, merge, deleteHabit, weekCount, isDue, dayScore, isPerfect, perfectStreak,
     streak, bestStreak, percent, percentBetween, monthStats, cellStatus, weakDay, validate, newId, defaultData };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.HabitLogic = api;
