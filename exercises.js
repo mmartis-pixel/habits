@@ -18,13 +18,50 @@
 
   // ---- drawing: front/back muscle map (polygons above) and a side/front-view mannequin ----
   const C = { main: '#E24B4A', help: '#F09595', base: '#3a3f4a', body: '#e8eaed', edge: '#0f1115', gear: '#5b6270', arrow: '#5DCAA5' };
+  // front and back are easy to mix up: the back view gets a caption and dark "hair" on the head
+  const HEAD_BACK = '#20242b';
   function muscleMapSvg(main = [], help = []) {
-    const fill = m => (main.includes(m) ? C.main : help.includes(m) ? C.help : C.base);
-    const view = (v, label) => `<svg viewBox="0 0 100 220" class="mmap" role="img" aria-label="${label}">${POLY[v].map(([m, pts]) =>
-      pts.map(p => `<polygon points="${p}" fill="${fill(m)}"/>`).join('')).join('')}</svg>`;
+    const fill = (v, m) => (main.includes(m) ? C.main : help.includes(m) ? C.help : v === 'back' && m === 'HEAD' ? HEAD_BACK : C.base);
+    const view = (v, label) => `<svg viewBox="0 0 100 234" class="mmap" role="img" aria-label="${label}">${POLY[v].map(([m, pts]) =>
+      pts.map(p => `<polygon points="${p}" fill="${fill(v, m)}"/>`).join('')).join('')}
+      <text x="50" y="232" text-anchor="middle" font-size="10" font-weight="700" letter-spacing="1.5" fill="#8b93a1">${v === 'front' ? 'FRONT' : 'BACK'}</text></svg>`;
     return view('front', 'Front view, worked muscles in red') + view('back', 'Back view, worked muscles in red');
   }
-
+  // body map to pick a muscle (the user's design): back view on the left with its labels on the left, front view on the right
+  // with labels on the right, a line from each label to its muscle. The picked muscle lights up on both views.
+  const SEC_MUSCLES = { Chest: ['CHEST'], Shoulders: ['FRONT_DELTOIDS', 'BACK_DELTOIDS'], Biceps: ['BICEPS'], Forearms: ['FOREARM'],
+    Abs: ['ABS'], Obliques: ['OBLIQUES'], Quads: ['QUADRICEPS', 'ADDUCTORS'], 'Upper back': ['TRAPEZIUS'], Lats: ['UPPER_BACK'],
+    Triceps: ['TRICEPS'], 'Lower back': ['LOWER_BACK'], Glutes: ['GLUTEAL'], Hamstrings: ['HAMSTRING'], Calves: ['CALVES'] };
+  const SIDE = { back: ['Upper back', 'Lats', 'Triceps', 'Lower back', 'Glutes', 'Hamstrings', 'Calves'],
+    front: ['Shoulders', 'Chest', 'Biceps', 'Forearms', 'Abs', 'Obliques', 'Quads'] };
+  const secOfMuscle = (view, m) => SIDE[view].find(s => SEC_MUSCLES[s].includes(m)) || Object.keys(SEC_MUSCLES).find(s => SEC_MUSCLES[s].includes(m));
+  const centre = p => { const n = p.split(' ').map(Number), xs = n.filter((_, i) => i % 2 === 0), ys = n.filter((_, i) => i % 2);
+    return [xs.reduce((a, b) => a + b) / xs.length, ys.reduce((a, b) => a + b) / ys.length]; };
+  function bodyPickerSvg(sel) {
+    const W = 380, LW = 88, FX = { back: 94, front: 186 }, TOP = 22, lit = sel ? SEC_MUSCLES[sel] || [] : [];
+    const figure = v => POLY[v].map(([m, pts]) => { const sec = secOfMuscle(v, m), on = lit.includes(m);
+      const fill = on ? C.main : v === 'back' && m === 'HEAD' ? HEAD_BACK : C.base;
+      const shapes = pts.map(p => `<polygon points="${p}" fill="${fill}"/>`).join('');
+      return sec ? `<g class="bm-m" data-act="g-lsec" data-v="${sec}">${shapes}</g>` : shapes; }).join('');
+    // labels: next to their muscle, pushed down so they don't overlap
+    const labels = v => { const left = v === 'back'; let lastY = -99;
+      return SIDE[v].map(s => { const m = SEC_MUSCLES[s].find(x => POLY[v].some(([k]) => k === x));
+          const cs = POLY[v].filter(([k]) => k === m).flatMap(([, ps]) => ps.map(centre)).sort((a, b) => (left ? a[0] - b[0] : b[0] - a[0]));
+          return [s, [cs[0][0] + FX[v], cs[0][1] + TOP]]; })
+        .sort((a, b) => a[1][1] - b[1][1]).map(([s, [ax, ay]]) => {
+          const y = lastY = Math.max(ay, lastY + 29), on = s === sel, bx = left ? 2 : W - LW - 2, lx = left ? bx + LW : bx;
+          return `<g class="bm-l${on ? ' on' : ''}" data-act="g-lsec" data-v="${s}" role="button" tabindex="0" aria-pressed="${on}" aria-label="${s}">
+            <line x1="${lx}" y1="${y}" x2="${ax.toFixed(1)}" y2="${ay.toFixed(1)}" stroke="${on ? C.main : '#5b6270'}" stroke-width="1"/>
+            <circle cx="${ax.toFixed(1)}" cy="${ay.toFixed(1)}" r="2" fill="${on ? C.main : '#8b93a1'}"/>
+            <rect x="${bx}" y="${y - 12}" width="${LW}" height="24" rx="12" fill="${on ? C.main : '#1b1f27'}" stroke="${on ? C.main : '#3a3f4a'}"/>
+            <text x="${bx + LW / 2}" y="${y + 4.5}" text-anchor="middle" font-size="12.5" font-weight="700" fill="${on ? '#fff' : '#e8eaed'}">${s}</text></g>`;
+        }).join(''); };
+    return `<svg viewBox="0 0 ${W} 262" class="bodymap" role="group" aria-label="Pick a muscle">
+      <text x="${FX.back + 50}" y="14" text-anchor="middle" font-size="10" font-weight="700" letter-spacing="1.5" fill="#8b93a1">BACK</text>
+      <text x="${FX.front + 50}" y="14" text-anchor="middle" font-size="10" font-weight="700" letter-spacing="1.5" fill="#8b93a1">FRONT</text>
+      <g transform="translate(${FX.back} ${TOP})">${figure('back')}</g><g transform="translate(${FX.front} ${TOP})">${figure('front')}</g>
+      ${labels('back')}${labels('front')}</svg>`;
+  }
   // mannequin from joint angles (degrees: 0 = right, 90 = up). Limb lengths stay the same in every picture.
   // anchor: ankle (standing) or hip. thigh = hip→knee, shin = knee→ankle, torso = hip→shoulder, arm = shoulder→elbow, fore = elbow→hand.
   // front: both arms/legs drawn from shoulders/hips spread sideways. *2 = second limb (side view: behind).
@@ -375,7 +412,7 @@
       + `<line x1="8" y1="133" x2="112" y2="133" stroke="#2a2f38" stroke-width="2"/>${gear}${body}${head}</svg>`;
   }
 
-  const api = { LIST, GROUPS, byKey, find, stepsOf, muscleMapSvg, animSvg, CREDIT };
+  const api = { LIST, GROUPS, byKey, find, stepsOf, muscleMapSvg, bodyPickerSvg, SEC_MUSCLES, animSvg, CREDIT };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.OlyxExercises = api;
 })(this);

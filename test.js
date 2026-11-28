@@ -381,19 +381,19 @@ assert.notStrictEqual(L.newId(), L.newId());
   assert.deepStrictEqual(s.map(t => t.name), ['Push', 'Pull', 'Legs']);
   assert.deepStrictEqual(s.map(t => t.days), [[0], [2], [4]]);
   assert.ok(s.every(t => t.items.length === 5 && t.items.every(i => Object.keys(i).join() === 'lib,sets,warm')));
-  assert.deepStrictEqual(keys(s[0]).slice(0, 3), ['machine-chest-press', 'incline-dumbbell-press', 'dumbbell-shoulder-press']); // multi-joint first
+  assert.deepStrictEqual(keys(s[0]).slice(0, 3), ['machine-chest-press', 'dumbbell-shoulder-press', 'incline-dumbbell-press']); // chest, shoulders, chest: muscles rest in between
   s = L.suggestSplit({ perWeek: 3, daysOff: [0], minutes: 60, style: 2 });
   assert.deepStrictEqual(s.flatMap(t => t.days).sort(), [1, 2, 4]);                        // Monday off → Tue/Wed/Fri
   s = L.suggestSplit({ perWeek: 3, minutes: 60, style: 0 });
   assert.ok(s.every(t => t.items.length === 3));
-  assert.deepStrictEqual(keys(s[0]), ['machine-chest-press', 'incline-dumbbell-press', 'lateral-raise']); // strength: 2/3 multi-joint
+  assert.deepStrictEqual(keys(s[0]), ['machine-chest-press', 'dumbbell-shoulder-press', 'incline-dumbbell-press']); // 3 exercises: the top priorities, in workout order
   assert.strictEqual(L.suggestSplit({ perWeek: 3, minutes: 60, style: 4 })[0].items.length, 6);
   assert.deepStrictEqual(L.suggestSplit({ perWeek: 6, daysOff: [0, 1], minutes: 60, style: 2 }), []);
   s = L.suggestSplit({ perWeek: 4, minutes: 60, style: 2 });
   assert.deepStrictEqual(s.map(t => [t.name, t.days]), [['Upper', [0, 3]], ['Lower', [1, 4]]]);
   s = L.suggestSplit({ perWeek: 2, minutes: 45, style: 2 });
   assert.deepStrictEqual(s.map(t => [t.name, t.days]), [['Full body A', [0]], ['Full body B', [3]]]);
-  assert.strictEqual(s[1].items[0].lib, 'romanian-deadlift');                                // B starts 3 compounds later
+  assert.strictEqual(s[1].items[0].lib, 'hack-squat');                                       // B starts 3 compounds later
 
   // apply: names from a lookup, links the existing "workout" habit, sets its days and the style
   const names = { 'machine-chest-press': 'Machine chest press' }, nameOf = k => names[k] || k;
@@ -551,7 +551,7 @@ assert.notStrictEqual(L.newId(), L.newId());
 {
   const s = L.suggestSplit({ perWeek: 3, minutes: 60, style: 0 });
   // the helper decides: strength compound 3 warm-ups + 3 sets, isolation 1 + 2; balanced/hypertrophy compound 2 + 2, isolation 1 + 2
-  assert.deepStrictEqual(s[0].items.map(i => [i.sets, i.warm]), [[3, 3], [3, 3], [2, 1]]); // 60 min of strength = 2 compound lifts + 1 isolation
+  assert.deepStrictEqual(s[0].items.map(i => [i.sets, i.warm]), [[3, 3], [3, 3], [3, 3]]); // 60 min of strength = the 3 multi-joint lifts
   assert.deepStrictEqual(L.helperPlan(4, true), { sets: 2, warm: 2 });
   assert.deepStrictEqual(L.helperPlan(2, false), { sets: 2, warm: 1 });
   assert.strictEqual(s[0].style, 0);
@@ -601,13 +601,16 @@ assert.notStrictEqual(L.newId(), L.newId());
   assert.deepStrictEqual(names(L.suggestSplit({ type: 'ulppl', perWeek: 5, minutes: 60 })), ['Upper:0', 'Lower:1', 'Push:2', 'Pull:3', 'Legs:4']);
   assert.deepStrictEqual(names(L.suggestSplit({ type: 'fbeod', perWeek: 4, minutes: 60 })), ['Full body A:04', 'Full body B:26']); // every other day
   assert.deepStrictEqual(names(L.suggestSplit({ type: 'fb', perWeek: 3, minutes: 60 })), ['Full body A:04', 'Full body B:2']);
-  assert.deepStrictEqual(L.suggestSplit({ type: 'ppl', perWeek: 4, minutes: 60 }), []);              // PPL is 3 or 6 a week
+  assert.deepStrictEqual(L.suggestSplit({ type: 'ppl', perWeek: 4, minutes: 60 }), []);
+  // the user's order for Upper: chest, back, triceps (after back), biceps (before chest), chest, shoulders, back
+  assert.deepStrictEqual(L.suggestSplit({ type: 'ul', perWeek: 4, minutes: 82, style: 2 })[0].items.map(i => i.lib),
+    ['machine-chest-press', 'lat-pulldown', 'triceps-pushdown', 'preacher-curl', 'incline-dumbbell-press', 'lateral-raise', 'seated-cable-row']);              // PPL is 3 or 6 a week
   for (const [k, T] of Object.entries(L.SPLIT_TYPES)) for (const n of Object.keys(T.seq))
     assert.ok(L.suggestSplit({ type: k, perWeek: Number(n), minutes: 60 }).every(t => t.items.length >= 3), k + n);
   // the helper offers at most 3 splits per times a week, each works for that number and has an "about"
   for (const [n, keys] of Object.entries(L.SPLIT_OPTIONS)) {
     assert.ok(keys.length >= 1 && keys.length <= 3 && keys.includes(L.DEFAULT_TYPE[n]), 'options ' + n);
-    for (const k of keys) assert.ok(L.SPLIT_TYPES[k].about && L.suggestSplit({ type: k, perWeek: Number(n), minutes: 60 }).length, k + n);
+    for (const k of keys) assert.ok(L.SPLIT_TYPES[k].about && L.SPLIT_TYPES[k].time && L.suggestSplit({ type: k, perWeek: Number(n), minutes: 60 }).length, k + n);
   }
   const own = L.suggestSplit({ type: 'ul', perWeek: 4, minutes: 60, own: true });
   assert.deepStrictEqual(own, [{ name: 'Upper', days: [0, 3], items: [] }, { name: 'Lower', days: [1, 4], items: [] }]); // no style: My week asks sets
@@ -622,7 +625,7 @@ assert.notStrictEqual(L.newId(), L.newId());
   const keys = EX.LIST.map(e => e.key);
   assert.strictEqual(new Set(keys).size, keys.length);
   assert.ok(keys.length >= 35);
-  for (const k of Object.values(L.SPLIT_KEYS).flatMap(t => [...t.compound, ...t.isolation])) assert.ok(EX.byKey(k), 'missing library key ' + k);
+  for (const k of Object.values(L.SPLIT_KEYS).flatMap(t => t.map(e => e[0]))) assert.ok(EX.byKey(k), 'missing library key ' + k);
   const valid = new Set(['CHEST', 'OBLIQUES', 'ABS', 'BICEPS', 'TRICEPS', 'NECK', 'FRONT_DELTOIDS', 'ADDUCTORS', 'QUADRICEPS', 'CALVES', 'FOREARM',
     'TRAPEZIUS', 'BACK_DELTOIDS', 'UPPER_BACK', 'LOWER_BACK', 'GLUTEAL', 'HAMSTRING']);
   for (const e of EX.LIST) {

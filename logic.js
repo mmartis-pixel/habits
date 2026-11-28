@@ -133,20 +133,36 @@
   const planOf = i => ({ sets: count(i && i.sets, 1, 8, 3), warm: count(i && i.warm, 0, 4, 0) });
 
   // ---- split helper: proven splits, no AI. Library keys (exercises.js has names and pictures). ----
-  // Picked from the user's own list (2026-11-28) and well-known lifts that are easy to learn: machines, cables and
-  // dumbbells first; no barbell squat, deadlift, pull-up or barbell row. compound = gets more warm-ups (helperPlan).
+  // Each workout is a fixed order built on the user's rules (2026-11-28): the same muscle never twice in a row, big and small
+  // muscles get time to rest (chest, back, chest, back…), biceps go before a chest lift and triceps after a back lift (triceps
+  // help on most chest lifts). Entry = [library key, priority, multi-joint]. A shorter session keeps the lowest priorities
+  // and leaves the order as it is. Easy-to-learn lifts from the user's own list: machines, cables and dumbbells first.
   const SPLIT_KEYS = {
-    push: { compound: ['machine-chest-press', 'incline-dumbbell-press', 'dumbbell-shoulder-press', 'dips'], isolation: ['lateral-raise', 'pec-deck', 'triceps-pushdown', 'overhead-triceps-extension'] },
-    pull: { compound: ['lat-pulldown', 'seated-cable-row', 'one-arm-dumbbell-row', 'wide-grip-cable-row'], isolation: ['reverse-pec-deck', 'preacher-curl', 'bayesian-curl', 'shrug', 'reverse-curl'] },
-    legs: { compound: ['hack-squat', 'leg-press', 'romanian-deadlift', 'hip-thrust'], isolation: ['leg-curl', 'leg-extension', 'calf-raise', 'hip-adduction', 'cable-crunch'] },
-    upper: { compound: ['machine-chest-press', 'lat-pulldown', 'incline-dumbbell-press', 'seated-cable-row', 'dumbbell-shoulder-press'], isolation: ['lateral-raise', 'triceps-pushdown', 'preacher-curl', 'reverse-pec-deck', 'pec-deck'] },
-    lower: { compound: ['hack-squat', 'romanian-deadlift', 'leg-press', 'hip-thrust'], isolation: ['leg-curl', 'leg-extension', 'calf-raise', 'hip-adduction', 'cable-crunch'] },
-    full: { compound: ['leg-press', 'machine-chest-press', 'lat-pulldown', 'romanian-deadlift', 'dumbbell-shoulder-press', 'seated-cable-row'], isolation: ['lateral-raise', 'leg-curl', 'triceps-pushdown', 'preacher-curl', 'cable-crunch'] },
-    anterior: { compound: ['hack-squat', 'machine-chest-press', 'incline-dumbbell-press', 'dumbbell-shoulder-press', 'leg-press'], isolation: ['leg-extension', 'lateral-raise', 'pec-deck', 'preacher-curl', 'cable-crunch'] },
-    posterior: { compound: ['romanian-deadlift', 'lat-pulldown', 'seated-cable-row', 'hip-thrust', 'wide-grip-cable-row'], isolation: ['leg-curl', 'reverse-pec-deck', 'triceps-pushdown', 'calf-raise', 'shrug'] },
-    chestback: { compound: ['machine-chest-press', 'lat-pulldown', 'incline-dumbbell-press', 'seated-cable-row', 'dips', 'wide-grip-cable-row'], isolation: ['pec-deck', 'reverse-pec-deck', 'straight-arm-pulldown'] },
-    shoulderarms: { compound: ['dumbbell-shoulder-press', 'dips'], isolation: ['lateral-raise', 'preacher-curl', 'triceps-pushdown', 'reverse-pec-deck', 'bayesian-curl', 'overhead-triceps-extension', 'shrug', 'reverse-curl'] },
+    upper: [['machine-chest-press', 1, true], ['lat-pulldown', 1, true], ['triceps-pushdown', 6, false], ['preacher-curl', 5, false],
+      ['incline-dumbbell-press', 3, true], ['lateral-raise', 4, false], ['seated-cable-row', 2, true], ['reverse-pec-deck', 7, false]],
+    lower: [['hack-squat', 1, true], ['romanian-deadlift', 1, true], ['leg-press', 2, true], ['leg-curl', 2, false],
+      ['leg-extension', 3, false], ['calf-raise', 4, false], ['hip-thrust', 5, true], ['hip-adduction', 6, false]],
+    push: [['machine-chest-press', 1, true], ['dumbbell-shoulder-press', 2, true], ['incline-dumbbell-press', 1, true], ['lateral-raise', 3, false],
+      ['pec-deck', 4, false], ['triceps-pushdown', 3, false], ['overhead-triceps-extension', 5, false], ['dips', 6, true]],
+    pull: [['lat-pulldown', 1, true], ['seated-cable-row', 1, true], ['reverse-pec-deck', 3, false], ['preacher-curl', 2, false],
+      ['one-arm-dumbbell-row', 4, true], ['bayesian-curl', 5, false], ['shrug', 6, false], ['reverse-curl', 7, false]],
+    legs: [['hack-squat', 1, true], ['romanian-deadlift', 1, true], ['leg-press', 2, true], ['leg-curl', 2, false],
+      ['leg-extension', 3, false], ['calf-raise', 4, false], ['hip-thrust', 5, true], ['cable-crunch', 6, false]],
+    full: [['leg-press', 1, true], ['machine-chest-press', 1, true], ['lat-pulldown', 1, true], ['romanian-deadlift', 2, true],
+      ['dumbbell-shoulder-press', 3, true], ['seated-cable-row', 3, true], ['triceps-pushdown', 4, false], ['preacher-curl', 5, false]],
+    fullb: [['hack-squat', 1, true], ['incline-dumbbell-press', 1, true], ['one-arm-dumbbell-row', 1, true], ['leg-curl', 2, false],
+      ['lateral-raise', 3, false], ['wide-grip-cable-row', 3, true], ['triceps-pushdown', 4, false], ['bayesian-curl', 5, false]],
+    anterior: [['hack-squat', 1, true], ['machine-chest-press', 1, true], ['leg-press', 3, true], ['dumbbell-shoulder-press', 2, true],
+      ['leg-extension', 4, false], ['incline-dumbbell-press', 2, true], ['lateral-raise', 5, false], ['preacher-curl', 6, false]],
+    posterior: [['romanian-deadlift', 1, true], ['lat-pulldown', 1, true], ['leg-curl', 2, false], ['seated-cable-row', 2, true],
+      ['hip-thrust', 3, true], ['reverse-pec-deck', 4, false], ['triceps-pushdown', 5, false], ['calf-raise', 6, false]],
+    chestback: [['machine-chest-press', 1, true], ['lat-pulldown', 1, true], ['incline-dumbbell-press', 2, true], ['seated-cable-row', 2, true],
+      ['pec-deck', 3, false], ['wide-grip-cable-row', 3, true], ['dips', 5, true], ['straight-arm-pulldown', 4, false]],
+    shoulderarms: [['dumbbell-shoulder-press', 1, true], ['preacher-curl', 2, false], ['triceps-pushdown', 2, false], ['lateral-raise', 1, false],
+      ['bayesian-curl', 4, false], ['overhead-triceps-extension', 4, false], ['reverse-pec-deck', 3, false], ['reverse-curl', 6, false]],
   };
+  // n exercises of a workout: the n lowest priorities, kept in the workout's order
+  const pickExercises = (seq, n) => seq.map((e, i) => [e, i]).sort((a, b) => a[0][1] - b[0][1] || a[1] - b[1]).slice(0, n).sort((a, b) => a[1] - b[1]).map(x => x[0]);
   // split types to pick from; each lists the workout order for the times a week it supports
   const FB = ['Full body A', 'Full body B'], UL = ['Upper', 'Lower'], PPL = ['Push', 'Pull', 'Legs'], AP = ['Anterior', 'Posterior'], ARN = ['Chest & back', 'Shoulders & arms', 'Legs'];
   const SPLIT_TYPES = {
@@ -161,18 +177,18 @@
   const DEFAULT_TYPE = { 2: 'fb', 3: 'ppl', 4: 'ul', 5: 'ulppl', 6: 'ppl' };
   // what the helper offers for each number of sessions a week (at most 3, the usual pick first), with a one-line "about"
   const SPLIT_OPTIONS = { 2: ['fb', 'ul', 'ap'], 3: ['fb', 'ppl', 'arnold'], 4: ['ul', 'ap', 'fbeod'], 5: ['ulppl'], 6: ['ppl', 'arnold'] };
-  // honest session times (the user: most splits take 60–90 min, full body closer to 2 h)
-  Object.assign(SPLIT_TYPES.fb, { about: 'The whole body every session. Long sessions, about 90–120 min.' });
-  Object.assign(SPLIT_TYPES.fbeod, { about: 'The whole body, always a rest day in between. About 90–120 min.' });
-  Object.assign(SPLIT_TYPES.ul, { about: 'Upper: chest, back, shoulders, arms. Lower: legs, glutes, core. About 60–90 min.' });
-  Object.assign(SPLIT_TYPES.ppl, { about: 'Push: chest, shoulders, triceps. Pull: back, biceps. Legs. About 60–90 min.' });
-  Object.assign(SPLIT_TYPES.ulppl, { about: 'Upper and lower, then push, pull and legs. About 60–90 min.' });
-  Object.assign(SPLIT_TYPES.ap, { about: 'Front: quads, chest, shoulders, biceps, abs. Back: hamstrings, glutes, back, triceps. About 60–90 min.' });
-  Object.assign(SPLIT_TYPES.arnold, { about: 'Chest and back, shoulders and arms, legs. About 75–90 min.' });
+  // honest session times (the user: most splits take 60–90 min, full body closer to 2 h); `about` is shown under Details
+  Object.assign(SPLIT_TYPES.fb, { time: '90–120 min', about: 'The whole body every session. Great for beginners: every muscle is trained twice or more a week.' });
+  Object.assign(SPLIT_TYPES.fbeod, { time: '90–120 min', about: 'The whole body every session, always with a rest day in between.' });
+  Object.assign(SPLIT_TYPES.ul, { time: '60–90 min', about: 'Upper: chest, back, shoulders, arms. Lower: legs, glutes, calves. Each half twice a week.' });
+  Object.assign(SPLIT_TYPES.ppl, { time: '60–90 min', about: 'Push: chest, shoulders, triceps. Pull: back, biceps, rear shoulders. Legs: quads, hamstrings, glutes, calves.' });
+  Object.assign(SPLIT_TYPES.ulppl, { time: '60–90 min', about: 'Upper and lower first, then push, pull and legs. Every muscle twice a week.' });
+  Object.assign(SPLIT_TYPES.ap, { time: '60–90 min', about: 'Front: quads, chest, shoulders, biceps. Back: hamstrings, glutes, back, triceps, calves.' });
+  Object.assign(SPLIT_TYPES.arnold, { time: '75–90 min', about: 'Chest and back together, shoulders and arms together, then legs.' });
   // "Leave it to OLYX" for the session length: the middle of the usual time for that split
   const SESSION_MIN = { fb: 105, fbeod: 105, arnold: 82 };
   const sessionMinutes = type => SESSION_MIN[type] || 75;
-  const SPLIT_TYPE = { 'Full body A': 'full', 'Full body B': 'full', Push: 'push', Pull: 'pull', Legs: 'legs', Upper: 'upper', Lower: 'lower',
+  const SPLIT_TYPE = { 'Full body A': 'full', 'Full body B': 'fullb', Push: 'push', Pull: 'pull', Legs: 'legs', Upper: 'upper', Lower: 'lower',
     Anterior: 'anterior', Posterior: 'posterior', 'Chest & back': 'chestback', 'Shoulders & arms': 'shoulderarms' };
   const PREF_DAYS = { 2: [0, 3], 3: [0, 2, 4], 4: [0, 1, 3, 4], 5: [0, 1, 2, 3, 4], 6: [0, 1, 2, 3, 4, 5] };
   // the helper decides sets and warm-ups (the user's rule: compound lifts get more warm-ups than isolation)
@@ -209,12 +225,7 @@
     seq.forEach((name, i) => {
       let t = out.find(x => x.name === name);
       if (!t) {
-        const k = SPLIT_KEYS[SPLIT_TYPE[name]];
-        const comp = name === 'Full body B' ? [...k.compound.slice(3), ...k.compound.slice(0, 3)] : k.compound;
-        // multi-joint lifts first, then isolation: strength gets about 2/3 multi-joint, otherwise about half
-        const c = Math.min(comp.length, Math.max(n - k.isolation.length, Math.ceil(n * (style <= 1 ? 2 / 3 : 1 / 2))));
-        const order = [...comp.slice(0, c), ...k.isolation.slice(0, n - c)];
-        t = { name, days: [], style, items: order.map(lib => ({ lib, ...helperPlan(style, k.compound.includes(lib)) })) };
+        t = { name, days: [], style, items: pickExercises(SPLIT_KEYS[SPLIT_TYPE[name]], n).map(([lib, , multi]) => ({ lib, ...helperPlan(style, multi) })) };
         out.push(t);
       }
       t.days.push(days[i]);
