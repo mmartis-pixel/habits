@@ -278,6 +278,16 @@
   .pm-count { padding: 9px 0 0; font-size: .72rem; color: var(--muted); }
   .pm-count b { text-align: center; color: var(--text); font-weight: 600; }
   .pm .add { width: 100%; margin-top: 14px; }
+  .ptop { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .ptop .btn { width: auto; margin: 0; padding: 8px 18px; }
+  .plist { max-width: 560px; margin-top: 8px; }
+  .prow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .prow .pm-name { flex: 1 1 140px; }
+  .pdots { display: flex; gap: 6px; }
+  .pdots .pm-d { width: 28px; height: 28px; font-size: .68rem; font-weight: 700; color: var(--muted); }
+  .pdots .pm-d.on { color: var(--bg); }
+  .pflex { font-size: .8rem; font-weight: 600; color: var(--accent); padding: 5px 12px; border-radius: 999px; border: 1px solid rgb(52 211 153 / .4); }
+  #hform .ideas { margin: 0 0 4px; }
   .ideas { margin: 10px 0 14px; padding: 12px; border-radius: 14px; border: 1px dashed rgb(52 211 153 / .4); }
   .ideas > b { display: block; font-size: .85rem; margin-bottom: 8px; }
   .ideas > div { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -921,55 +931,26 @@ document.addEventListener('mouseover', e => { const d = canHover && e.target.clo
 document.addEventListener('mouseout', e => { if (canHover && e.target.closest('.dt[data-day]')) hideTip(); });
 addEventListener('scroll', hideTip, { passive: true });
 
-// ---- Plan: 8 columns (Every day + Mon..Sun), flexible habits below ----
+// ---- Plan: one list of habits, Mo–Su dots per habit ----
 const FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 function renderPlan() {
-  const active = data.habits.filter(h => !h.archived);
-  const todayDow = L.dow(today());
-  const cols = [
-    { key: 'daily', title: 'Every day', list: active.filter(h => h.freq.kind === 'daily') },
-    ...WD.map((d, i) => ({ key: i, title: d, today: i === todayDow, list: active.filter(h => h.freq.kind === 'days' && h.freq.days.includes(i)) })),
-  ];
-  const flex = active.filter(h => h.freq.kind === 'weekly');
-  const archived = data.habits.filter(h => h.archived);
-  const card = h => `<button class="pcard" data-act="edit" data-id="${esc(h.id)}" title="${esc([h.name, h.note].filter(Boolean).join(' — '))}">
-    <span class="name">${esc(h.name)}</span>${h.note ? `<span class="note">${esc(h.note)}</span>` : ''}
-    ${h.freq.kind === 'weekly' ? `<span class="note">${freqText(h.freq)}</span>` : ''}</button>`;
-  // cards shrink as the fullest column grows, so ~10 habits still fit on one screen
-  const most = Math.max(...cols.map(c => c.list.length));
-  const density = most >= 9 ? 'dense' : most >= 6 ? 'compact' : '';
-  // phone: one row per habit with 7 day circles — tap to plan / unplan a day (the board below is for wide screens)
-  const planned = active.filter(h => h.freq.kind !== 'weekly');
-  const onDay = (h, d) => h.freq.kind === 'daily' || h.freq.days.includes(d);
-  const matrix = `<div class="pm">
-    <div class="pm-head"><span></span>${WD.map((d, i) => `<b class="${i === todayDow ? 'now' : ''}">${d[0]}</b>`).join('')}</div>
-    ${planned.map(h => `<div class="pm-row">
-      <button class="pm-name" data-act="edit" data-id="${esc(h.id)}"><span class="name">${esc(h.name)}</span>
-        <span class="note">${esc([h.freq.kind === 'daily' ? 'Every day' : freqText(h.freq), h.note].filter(Boolean).join(' · '))}</span></button>
-      ${WD.map((d, i) => `<button class="pm-d ${onDay(h, i) ? 'on' : ''} ${i === todayDow ? 'now' : ''}" data-act="pday" data-id="${esc(h.id)}" data-d="${i}"
-        aria-pressed="${onDay(h, i)}" aria-label="${esc(h.name)} on ${FULL[i]}"></button>`).join('')}
-    </div>`).join('') || '<p class="muted">No habits planned yet.</p>'}
-    ${planned.length ? `<div class="pm-count"><span>Habits per day</span>${WD.map((d, i) => `<b>${planned.filter(h => onDay(h, i)).length}</b>`).join('')}</div>` : ''}
-    <button class="add" data-act="new" data-col="any">+ Add habit</button>
-  </div>`;
-  const names = new Set(data.habits.map(h => h.name.toLowerCase()));
-  const left = SUGGEST.map((s, i) => [s, i]).filter(([s]) => !names.has(s[0].toLowerCase()));
-  const ideas = active.length < 5 && left.length ? `<div class="ideas"><b>${active.length ? 'More ideas' : 'Start with a few of these'}</b>
-    <div>${left.map(([[name, note], i]) => `<button class="idea" data-act="suggest" data-i="${i}">+ ${name}${note ? `<span>${note}</span>` : ''}</button>`).join('')}</div>
-    <p class="ideas-note">You can change the name, details and days anytime — just tap the habit.</p></div>` : '';
+  // one clean list (the user's pick, 2026-11-28): name, then Mo–Su dots you tap; flexible habits say "3× per week"; one Add
+  const active = data.habits.filter(h => !h.archived), todayDow = L.dow(today());
+  const archived = data.habits.filter(h => h.archived), gymId = data.gym && data.gym.habitId;
+  const onDay = (h, d) => h.freq.kind === 'daily' || (h.freq.kind === 'days' && h.freq.days.includes(d));
+  const order = [...active.filter(h => h.freq.kind !== 'weekly'), ...active.filter(h => h.freq.kind === 'weekly')];
+  const row = h => {
+    const flex = h.freq.kind === 'weekly', what = [flex ? '' : freqText(h.freq), h.id === gymId ? 'from Gym' : '', h.note].filter(Boolean).join(' · ');
+    return `<div class="prow">
+      <button class="pm-name" data-act="edit" data-id="${esc(h.id)}"><span class="name">${esc(h.name)}</span><span class="note">${esc(what)}</span></button>
+      ${flex ? `<span class="pflex">${h.freq.times}× per week</span>` : `<div class="pdots">${WD.map((d, i) => `<button class="pm-d ${onDay(h, i) ? 'on' : ''} ${i === todayDow ? 'now' : ''}"
+        data-act="pday" data-id="${esc(h.id)}" data-d="${i}" aria-pressed="${onDay(h, i)}" aria-label="${esc(h.name)} on ${FULL[i]}">${d[0]}</button>`).join('')}</div>`}
+    </div>`;
+  };
   return `
-    <h1 class="title">Weekly plan</h1>
-    ${ideas}
-    <p class="muted only-wide">Add habits to the days you want to do them. "Every day" habits show up on every day.</p>
-    <p class="muted only-narrow">Tap a circle to plan a habit on that day. Tap a name to edit it.</p>
-    ${matrix}
-    <div class="board ${density}">${cols.map(c => `<section class="col${c.today ? ' today' : ''}">
-      <header><b>${c.title}</b><span>${c.list.length}</span>${c.today ? '<em>Today</em>' : ''}</header>
-      ${c.list.map(card).join('') || '<p class="muted empty-col">Nothing yet</p>'}
-      <button class="add" data-act="new" data-col="${c.key}">+ Add</button>
-    </section>`).join('')}</div>
-    <h2>Flexible — any days of the week</h2>
-    <div class="flexlist">${flex.map(card).join('')}<button class="add" data-act="new" data-col="flex">+ Add flexible habit (e.g. 3× per week)</button></div>
+    <div class="ptop"><h1 class="title">Weekly plan</h1><button class="btn primary" data-act="new" data-col="any">+ Add</button></div>
+    ${order.length ? `<div class="plist">${order.map(row).join('')}</div>`
+      : `<p class="muted">No habits yet. Tap <b>+ Add</b> to pick one of the ideas or make your own.</p>`}
     ${archived.length ? `<h2>Archived (history kept)</h2>${archived.map(h => `<div class="row">
       <span class="txt"><span class="name">${esc(h.name)}</span><span class="note">${esc(freqText(h.freq))}</span></span>
       <button data-act="archive" data-id="${esc(h.id)}">Restore</button>
@@ -985,10 +966,13 @@ function sheet() {
   const e = isNew ? { name: '', note: '', freq: preset } : data.habits.find(h => h.id === editing);
   if (!e) return '';
   const fv = e.freq.kind === 'weekly' ? 'w' + e.freq.times : e.freq.kind;
-  // flexible habits pick only "N× per week", the rest only "Every day" / "Specific days"
-  const flexible = e.freq.kind === 'weekly';
-  const opts = (flexible ? [1, 2, 3, 4, 5, 6].map(n => ['w' + n, `${n}× per week`]) : [['daily', 'Every day'], ['days', 'Specific days']])
+  // a new habit picks any of them; an existing one stays fixed-day or flexible ("N× per week")
+  const flexible = e.freq.kind === 'weekly', weekly = [1, 2, 3, 4, 5, 6].map(n => ['w' + n, `${n}× per week (any days)`]);
+  const opts = (isNew && addCol === 'any' ? [['daily', 'Every day'], ['days', 'Specific days'], ...weekly] : flexible ? weekly : [['daily', 'Every day'], ['days', 'Specific days']])
     .map(([v, t]) => `<option value="${v}" ${v === fv ? 'selected' : ''}>${t}</option>`).join('');
+  // ideas live here now (not on the Plan page): one tap adds the habit
+  const taken = new Set(data.habits.map(h => h.name.toLowerCase()));
+  const ideas = isNew && addCol === 'any' ? SUGGEST.map((s, i) => [s, i]).filter(([s]) => !taken.has(s[0].toLowerCase())) : [];
   const picked = e.freq.kind === 'days' ? e.freq.days : [0, 1, 2, 3, 4];
   const chips = WD.map((d, i) => `<label class="chip"><input type="checkbox" name="day" value="${i}" ${picked.includes(i) ? 'checked' : ''}><span>${d.slice(0, 2)}</span></label>`).join('');
   const day = typeof addCol === 'number' ? addCol : null;
@@ -1001,6 +985,9 @@ function sheet() {
       ${existing.length ? `<div class="quick"><span class="muted">Add existing:</span>${existing.map(h =>
         `<button type="button" class="qchip" data-act="addday" data-id="${esc(h.id)}">${esc(h.name)}</button>`).join('')}</div>
         <div class="or">or create a new one</div>` : ''}
+      ${ideas.length ? `<div class="ideas"><b>Ideas</b><div>${ideas.map(([[name, note], i]) =>
+        `<button type="button" class="idea" data-act="suggest" data-i="${i}">+ ${name}${note ? `<span>${note}</span>` : ''}</button>`).join('')}</div></div>
+        <div class="or">or make your own</div>` : ''}
       <label>Name <input name="name" required maxlength="60" value="${esc(e.name)}" placeholder="e.g. Gym" autocomplete="off"></label>
       <label><span>Details <span class="rec">recommended</span></span>
         <input name="note" maxlength="80" value="${esc(e.note)}" placeholder="What counts as done, e.g. push day, 45 min" autocomplete="off"></label>
@@ -2077,7 +2064,7 @@ document.addEventListener('click', ev => {
     case 'ob-next': finishOnboarding(); pickAsk(); break;
     case 'suggest': { const [name, note, f] = SUGGEST[Number(b.dataset.i)];
       data.habits.push({ id: L.newId(), name, note, type: 'check', freq: f || { kind: 'daily' }, created: today(), archived: false, updated: Date.now() });
-      save(); Sfx.play('pop'); toast('Added', name); break; }
+      editing = null; save(); Sfx.play('pop'); toast('Added', name); break; }
     case 'install': installApp(); return;
     case 'gnative': nativeGoogle(); return;
     case 'ask-x': dismissAsk(); break;
