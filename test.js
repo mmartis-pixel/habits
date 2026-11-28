@@ -599,7 +599,12 @@ assert.notStrictEqual(L.newId(), L.newId());
   assert.deepStrictEqual(names(L.suggestSplit({ type: 'ap', perWeek: 4, minutes: 60 })), ['Anterior:03', 'Posterior:14']);
   assert.deepStrictEqual(names(L.suggestSplit({ type: 'arnold', perWeek: 3, minutes: 60 })), ['Chest & back:0', 'Shoulders & arms:2', 'Legs:4']);
   assert.deepStrictEqual(names(L.suggestSplit({ type: 'ulppl', perWeek: 5, minutes: 60 })), ['Upper:0', 'Lower:1', 'Push:2', 'Pull:3', 'Legs:4']);
-  assert.deepStrictEqual(names(L.suggestSplit({ type: 'fbeod', perWeek: 4, minutes: 60 })), ['Full body A:04', 'Full body B:26']); // every other day
+  // the user's rules: rest days are never used, a day off between two sessions of the same workout (incl. Sunday → Monday),
+  // full body needs a day off between every two sessions
+  assert.deepStrictEqual(names(L.suggestSplit({ type: 'fb', perWeek: 3, daysOff: [5, 6], minutes: 60 })), ['Full body A:04', 'Full body B:2']);
+  assert.deepStrictEqual(L.suggestSplit({ type: 'fb', perWeek: 3, daysOff: [0, 1, 2], minutes: 60 }), []); // Thu–Sun left: no 3 spaced days
+  assert.ok(L.suggestSplit({ type: 'ppl', perWeek: 6, daysOff: [6], minutes: 60 }).every(t => t.days.every((d, i, a) => !i || d - a[i - 1] >= 2)));
+  assert.deepStrictEqual(names(L.suggestSplit({ type: 'ul', perWeek: 4, daysOff: [3], minutes: 60 })), ['Upper:02', 'Lower:14']); // Thursday off: Upper Mon+Wed, Lower Tue+Fri
   assert.deepStrictEqual(names(L.suggestSplit({ type: 'fb', perWeek: 3, minutes: 60 })), ['Full body A:04', 'Full body B:2']);
   assert.deepStrictEqual(L.suggestSplit({ type: 'ppl', perWeek: 4, minutes: 60 }), []);
   // the user's order for Upper: chest, back, triceps (after back), biceps (before chest), chest, shoulders, back

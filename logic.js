@@ -166,8 +166,7 @@
   // split types to pick from; each lists the workout order for the times a week it supports
   const FB = ['Full body A', 'Full body B'], UL = ['Upper', 'Lower'], PPL = ['Push', 'Pull', 'Legs'], AP = ['Anterior', 'Posterior'], ARN = ['Chest & back', 'Shoulders & arms', 'Legs'];
   const SPLIT_TYPES = {
-    fb: { name: 'Full body', seq: { 2: FB, 3: [...FB, FB[0]] } },
-    fbeod: { name: 'Full body every other day', seq: { 3: [...FB, FB[0]], 4: [...FB, ...FB] }, days: { 3: [0, 2, 4], 4: [0, 2, 4, 6] } },
+    fb: { name: 'Full body', seq: { 2: FB, 3: [...FB, FB[0]] }, spaced: true }, // spaced: a day off between every two sessions
     ul: { name: 'Upper / Lower', seq: { 2: UL, 4: [...UL, ...UL] } },
     ppl: { name: 'Push / Pull / Legs', seq: { 3: PPL, 6: [...PPL, ...PPL] } },
     ulppl: { name: 'Upper / Lower + PPL', seq: { 5: [...UL, ...PPL] } },
@@ -176,17 +175,16 @@
   };
   const DEFAULT_TYPE = { 2: 'fb', 3: 'ppl', 4: 'ul', 5: 'ulppl', 6: 'ppl' };
   // what the helper offers for each number of sessions a week (at most 3, the usual pick first), with a one-line "about"
-  const SPLIT_OPTIONS = { 2: ['fb', 'ul', 'ap'], 3: ['fb', 'ppl', 'arnold'], 4: ['ul', 'ap', 'fbeod'], 5: ['ulppl'], 6: ['ppl', 'arnold'] };
+  const SPLIT_OPTIONS = { 2: ['fb', 'ul', 'ap'], 3: ['fb', 'ppl', 'arnold'], 4: ['ul', 'ap'], 5: ['ulppl'], 6: ['ppl', 'arnold'] };
   // honest session times (the user: most splits take 60–90 min, full body closer to 2 h); `about` is shown under Details
   Object.assign(SPLIT_TYPES.fb, { time: '90–120 min', about: 'The whole body every session. Great for beginners: every muscle is trained twice or more a week.' });
-  Object.assign(SPLIT_TYPES.fbeod, { time: '90–120 min', about: 'The whole body every session, always with a rest day in between.' });
   Object.assign(SPLIT_TYPES.ul, { time: '60–90 min', about: 'Upper: chest, back, shoulders, arms. Lower: legs, glutes, calves. Each half twice a week.' });
   Object.assign(SPLIT_TYPES.ppl, { time: '60–90 min', about: 'Push: chest, shoulders, triceps. Pull: back, biceps, rear shoulders. Legs: quads, hamstrings, glutes, calves.' });
   Object.assign(SPLIT_TYPES.ulppl, { time: '60–90 min', about: 'Upper and lower first, then push, pull and legs. Every muscle twice a week.' });
   Object.assign(SPLIT_TYPES.ap, { time: '60–90 min', about: 'Front: quads, chest, shoulders, biceps. Back: hamstrings, glutes, back, triceps, calves.' });
   Object.assign(SPLIT_TYPES.arnold, { time: '75–90 min', about: 'Chest and back together, shoulders and arms together, then legs.' });
   // "Leave it to OLYX" for the session length: the middle of the usual time for that split
-  const SESSION_MIN = { fb: 105, fbeod: 105, arnold: 82 };
+  const SESSION_MIN = { fb: 105, arnold: 82 };
   const sessionMinutes = type => SESSION_MIN[type] || 75;
   const SPLIT_TYPE = { 'Full body A': 'full', 'Full body B': 'fullb', Push: 'push', Pull: 'pull', Legs: 'legs', Upper: 'upper', Lower: 'lower',
     Anterior: 'anterior', Posterior: 'posterior', 'Chest & back': 'chestback', 'Shoulders & arms': 'shoulderarms' };
@@ -196,24 +194,31 @@
     if (style <= 1) return compound ? { sets: 3, warm: 3 } : { sets: 2, warm: 1 }; // strength
     return compound ? { sets: 2, warm: 2 } : { sets: 2, warm: 1 };                // balanced / hypertrophy (1–2 working)
   }
-  // preferred weekdays; a day off moves to the nearest free unused day (later first). [] = not enough free days
-  function pickDays(perWeek, daysOff, pref = PREF_DAYS[perWeek]) {
-    const free = [0, 1, 2, 3, 4, 5, 6].filter(d => !daysOff.includes(d)), out = [];
+  // training days: only free days (rest days are never used), and at least one day off between two sessions of the same
+  // workout, also from Sunday to next Monday (the user's rule). allSpaced: every session needs a day off before the next
+  // one (full body). Among the valid weeks the one closest to the preferred days wins. [] = no valid week.
+  function pickDays(perWeek, daysOff, pref = PREF_DAYS[perWeek], seq = null, allSpaced = false) {
+    const free = [0, 1, 2, 3, 4, 5, 6].filter(d => !daysOff.includes(d));
     if (!pref || free.length < perWeek) return [];
-    for (const d of pref) {
-      if (free.includes(d) && !out.includes(d)) { out.push(d); continue; }
-      for (let k = 1; k <= 6; k++) {
-        const c = [d + k, d - k].find(x => x >= 0 && x <= 6 && free.includes(x) && !out.includes(x));
-        if (c !== undefined) { out.push(c); break; }
+    const spaced = ds => ds.every((d, i) => (i ? d - ds[i - 1] : d + 7 - ds[ds.length - 1]) >= 2); // incl. the week wrap
+    const ok = ds => (allSpaced ? spaced(ds) : !seq || [...new Set(seq)].every(n => spaced(ds.filter((_, i) => seq[i] === n))));
+    let best = null, bestCost = Infinity;
+    const walk = (from, ds) => {
+      if (ds.length === perWeek) {
+        const cost = ds.reduce((c, d, i) => c + Math.abs(d - pref[i]), 0);
+        if (cost < bestCost && ok(ds)) { best = [...ds]; bestCost = cost; }
+        return;
       }
-    }
-    return out.sort((x, y) => x - y);
+      for (let i = from; i < free.length; i++) walk(i + 1, [...ds, free[i]]);
+    };
+    walk(0, []);
+    return best || [];
   }
   // → [{ name, days, style, items: [{ lib, sets, warm }] }]; exercise count from session length and the style's sets × rest.
   // own = the user picks the exercises: empty workouts, no style (My week then asks sets / warm-ups per exercise)
   function suggestSplit({ type, perWeek, daysOff = [], minutes, style = 2, own = false }) {
     const T = SPLIT_TYPES[type || DEFAULT_TYPE[perWeek]], seq = T && T.seq[perWeek];
-    const days = seq ? pickDays(perWeek, daysOff, (T.days && T.days[perWeek]) || PREF_DAYS[perWeek]) : [];
+    const days = seq ? pickDays(perWeek, daysOff, (T.days && T.days[perWeek]) || PREF_DAYS[perWeek], seq, T.spaced) : [];
     if (days.length !== perWeek || !seq) return [];
     if (own) {
       const out = [];
