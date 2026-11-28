@@ -1051,16 +1051,21 @@ function renderGym() {
 
 function helperSheet() {
   const s = gymSheet;
-  s.preview = L.suggestSplit({ perWeek: s.perWeek, daysOff: s.off, minutes: s.minutes, style: s.style });
+  s.preview = L.suggestSplit({ type: s.type, perWeek: s.perWeek, daysOff: s.off, minutes: s.minutes, style: s.style, own: s.own });
+  const T = L.SPLIT_TYPES[s.type], plan = p => `${p.warm} warm-up${p.warm === 1 ? '' : 's'} + ${p.sets} sets`;
   return gymWrap('Suggest a split', `
-    <p class="muted">How many times a week?</p>${seg('g-hper', s.perWeek, [2, 3, 4, 5, 6].map(n => [n, String(n)]))}
+    <p class="muted">Split</p><div class="gchips">${Object.entries(L.SPLIT_TYPES).map(([k, t]) =>
+      `<button class="gchip${k === s.type ? ' on' : ''}" data-act="g-htype" data-v="${k}" aria-pressed="${k === s.type}">${esc(t.name)}</button>`).join('')}</div>
+    <p class="muted">How many times a week?</p>${seg('g-hper', s.perWeek, Object.keys(T.seq).map(n => [Number(n), n]))}
     <p class="muted">Days off (optional)</p>${dayChips('g-hoff', s.off)}
-    <p class="muted">How long is a session?</p>${seg('g-hmin', s.minutes, [[45, '45 min'], [60, '60 min'], [90, '90 min']])}
+    <p class="muted">Exercises</p>${seg('g-hown', s.own ? 1 : 0, [[0, 'Suggest exercises'], [1, 'I have my own']])}
+    ${s.own ? '' : `<p class="muted">How long is a session?</p>${seg('g-hmin', s.minutes, [[45, '45 min'], [60, '60 min'], [90, '90 min']])}
     <div class="gstyle"><div class="gsl"><span>Strength</span><span>Training style</span><span>Hypertrophy</span></div>
       <input type="range" min="0" max="4" step="1" value="${s.style}" data-g="hstyle" aria-label="Training style, strength to hypertrophy">
-      <p class="muted ghint">${styleHint(L.STYLES[s.style])}</p></div>
+      <p class="muted ghint">${styleHint(L.STYLES[s.style])}</p>
+      <p class="muted ghint">Multi-joint lifts: ${plan(L.helperPlan(s.style, true))} · isolation: ${plan(L.helperPlan(s.style, false))}</p></div>`}
     ${s.preview.length ? `<div class="gprev">${s.preview.map(p => `<div class="card"><b>${esc(p.name)}</b> <span class="muted">${dayList(p.days)}</span>
-      <p class="muted">${p.items.map(i => esc(EX.byKey(i.lib).name)).join(', ')}</p></div>`).join('')}</div>
+      <p class="muted">${p.items.length ? p.items.map(i => esc(EX.byKey(i.lib).name)).join(', ') : 'You add the exercises in My week'}</p></div>`).join('')}</div>
       <button class="btn primary" data-act="g-happly">Use this split</button>`
     : '<p class="muted">Not enough free days. Pick fewer days off or train fewer times a week.</p>'}`);
 }
@@ -1079,10 +1084,13 @@ function weekSheet() {
     ${also ? `<p class="muted">Also on ${also}. Changes apply to every day with this workout.</p>` : ''}
     ${hint ? `<p class="ghint gwhint">${hint}</p>` : ''}
     ${tpl ? `<ul class="list gitems">${tpl.items.map((it, k) => { const p = L.planOf(it);
+      // the helper's workouts: sets and warm-ups are decided for you (shown, not asked); your own workouts: you pick
+      const plan = hint ? `<p class="muted gplan">${p.warm} warm-up${p.warm === 1 ? '' : 's'} · ${p.sets} working set${p.sets === 1 ? '' : 's'}</p>`
+        : `<div class="gplan"><select data-g="wsets" data-k="${k}" aria-label="Working sets for ${esc(exName(it.ex))}">${opts(1, 8, p.sets, 'set')}</select>
+        <select data-g="wwarm" data-k="${k}" aria-label="Warm-up sets for ${esc(exName(it.ex))}">${opts(0, 4, p.warm, 'warm-up')}</select></div>`;
       return `<li class="gitem2"><button class="gexn" data-act="g-exo" data-id="${it.ex}">${esc(exName(it.ex))}</button>
       <span class="gmv"><button data-act="g-wup" data-k="${k}" aria-label="Move up">↑</button><button data-act="g-wdown" data-k="${k}" aria-label="Move down">↓</button><button data-act="g-wdel" data-k="${k}" aria-label="Remove">×</button></span>
-      <div class="gplan"><select data-g="wsets" data-k="${k}" aria-label="Working sets for ${esc(exName(it.ex))}">${opts(1, 8, p.sets, 'set')}</select>
-        <select data-g="wwarm" data-k="${k}" aria-label="Warm-up sets for ${esc(exName(it.ex))}">${opts(0, 4, p.warm, 'warm-up')}</select></div></li>`; }).join('')}</ul>
+      ${plan}</li>`; }).join('')}</ul>
       <button class="btn" data-act="g-wadd">+ Add exercise</button>
       <button class="btn link" data-act="g-wrest">Make it a rest day</button>
       <button class="btn link gdanger" data-act="g-wdelete">Delete "${esc(tpl.name)}"${also ? ' from every day' : ''}</button>` : '<p class="muted">Rest day. Type a workout name above to train on this day.</p>'}
@@ -1116,7 +1124,11 @@ function librarySheet() {
 // the library adds to a workout template (My week) or to the open workout
 function addExerciseTo(target, exId, now) {
   const g = G();
-  if (target.kind === 'tpl') { const t = g.templates.find(x => x.id === target.id); if (t) { t.items.push({ ex: exId, sets: 3, warm: 0 }); t.updated = now; } }
+  if (target.kind === 'tpl') {
+    const t = g.templates.find(x => x.id === target.id), e = g.exercises.find(x => x.id === exId), lib = e && e.lib && EX.byKey(e.lib);
+    // a helper workout decides sets / warm-ups itself (multi-joint lifts get more warm-ups); your own: 3 sets, no warm-up
+    if (t) { t.items.push({ ex: exId, ...(Number.isInteger(t.style) ? L.helperPlan(t.style, !!(lib && lib.compound)) : { sets: 3, warm: 0 }) }); t.updated = now; }
+  }
   else { const w = g.workouts.find(x => x.id === target.id); if (w) { w.items.push(L.workoutItem(data, exId)); w.updated = now; } }
 }
 // a workout name typed or picked for the open day (applied on change, not on every key)
@@ -1146,7 +1158,9 @@ function gymAction(b) {
   const flip = (arr, x) => arr.includes(x) ? arr.filter(y => y !== x) : [...arr, x].sort((p, q) => p - q);
   switch (b.dataset.act) {
     case 'g-close': gymSheet = (gymSheet && gymSheet.from) || null; break; // exercise detail returns to where it was opened
-    case 'g-helper': gymSheet = { kind: 'helper', perWeek: 3, off: [], minutes: 60, style: Number.isInteger(G().style) ? G().style : 2 }; Sfx.play('soft'); break;
+    case 'g-helper': gymSheet = { kind: 'helper', type: 'ppl', perWeek: 3, off: [], minutes: 60, own: false, style: Number.isInteger(G().style) ? G().style : 2 }; Sfx.play('soft'); break;
+    case 'g-htype': { s.type = v; const ns = Object.keys(L.SPLIT_TYPES[v].seq).map(Number); if (!ns.includes(s.perWeek)) s.perWeek = ns[0]; break; }
+    case 'g-hown': s.own = v === '1'; break;
     case 'g-hper': s.perWeek = Number(v); break;
     case 'g-hoff': s.off = flip(s.off, Number(v)); break;
     case 'g-hmin': s.minutes = Number(v); break;

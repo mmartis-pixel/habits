@@ -522,8 +522,8 @@ assert.notStrictEqual(L.newId(), L.newId());
   assert.deepStrictEqual(L.exerciseHistory(g, 'e1'), [{ day: T, kg: 80 }]);
   const w2 = L.startWorkout(g, '2026-11-26', 't1', 30);
   assert.deepStrictEqual(w2.items[0].sets, [{ kg: 80, reps: 8, done: false }]);
-  L.setRowCount(g, w2, 0, true, 1, 31);                                  // "1st warm-up" chip: on top
-  assert.deepStrictEqual(w2.items[0].sets[0], { kg: 120, reps: 5, done: false, warm: true });
+  L.setRowCount(g, w2, 0, true, 1, 31);                                  // "1st warm-up" chip: on top, 55% of top 80 kg × 9
+  assert.deepStrictEqual(w2.items[0].sets[0], { reps: 9, done: false, warm: true, kg: 45 });
   assert.strictEqual(w2.items[0].sets.length, 2);
   w2.items[0].sets = [{ kg: 200, reps: 1, done: true, warm: true }, { kg: 85, reps: 6, done: true }];
   assert.deepStrictEqual(L.finishWorkout(g, w2.id, 40).records, [{ ex: 'e1', kg: 85 }]);
@@ -550,13 +550,16 @@ assert.notStrictEqual(L.newId(), L.newId());
 // --- gym v3: sets and warm-ups per exercise, chips, style only on helper workouts ---
 {
   const s = L.suggestSplit({ perWeek: 3, minutes: 60, style: 0 });
-  assert.deepStrictEqual(s[0].items.map(i => [i.sets, i.warm]).slice(0, 3), [[3, 2], [3, 2], [3, 0]]); // Strength = 3 sets; 2 compounds warmed up
+  // the helper decides: strength compound 3 warm-ups + 3 sets, isolation 1 + 2; balanced/hypertrophy compound 2 + 2, isolation 1 + 2
+  assert.deepStrictEqual(s[0].items.map(i => [i.sets, i.warm]), [[3, 3], [3, 3], [3, 3]]); // 60 min of strength = 3 compound lifts
+  assert.deepStrictEqual(L.helperPlan(4, true), { sets: 2, warm: 2 });
+  assert.deepStrictEqual(L.helperPlan(2, false), { sets: 2, warm: 1 });
   assert.strictEqual(s[0].style, 0);
   const d = data([daily()]);
   L.applySplit(d, s, T, 5);
   const t = d.gym.templates[0];
   assert.strictEqual(t.style, 0);
-  assert.deepStrictEqual([t.items[0].sets, t.items[0].warm], [3, 2]);
+  assert.deepStrictEqual([t.items[0].sets, t.items[0].warm], [3, 3]);
   const own = L.setDayWorkout(d, 6, 'Arms', 6);
   assert.strictEqual(own.style, undefined);                               // own workouts: no style
   assert.deepStrictEqual(L.planOf({ ex: 'x' }), { sets: 3, warm: 0 });   // v2 item
@@ -565,7 +568,7 @@ assert.notStrictEqual(L.newId(), L.newId());
 
   // chips: done rows are never removed; at least one working set; mid-workout exercise = 3 sets / 2 warm-ups
   const w = L.startWorkout(d, T, t.id, 10);
-  assert.deepStrictEqual(w.items[0].plan, { sets: 3, warm: 2 });
+  assert.deepStrictEqual(w.items[0].plan, { sets: 3, warm: 3 });
   assert.strictEqual(w.items[0].sets.length, 1);
   L.setRowCount(d, w, 0, false, 3, 11);
   L.setRowCount(d, w, 0, true, 2, 12);
@@ -580,6 +583,32 @@ assert.notStrictEqual(L.newId(), L.newId());
   const mid = L.workoutItem(d, 'e9');
   assert.deepStrictEqual(mid, { ex: 'e9', plan: { sets: 3, warm: 2 }, sets: [{ reps: 0, done: false }] });
   assert.ok(L.validate(d));
+
+  // warm-ups from the top working weight typed now: 55% × 9, 70% × 6, 85% × 4 (2.5 kg steps); no weight yet = reps only
+  const wi = { ex: 'e9', plan: { sets: 3, warm: 3 }, sets: [{ kg: 100, reps: 5, done: false }] }, ww = { id: 'ww', items: [wi] };
+  L.setRowCount(d, ww, 0, true, 3, 20);
+  assert.deepStrictEqual(wi.sets.filter(x => x.warm).map(x => [x.kg, x.reps]), [[55, 9], [70, 6], [85, 4]]);
+  const wn = { ex: 'e8', sets: [{ reps: 0, done: false }] };
+  L.setRowCount(d, { id: 'wn', items: [wn] }, 0, true, 1, 21);
+  assert.deepStrictEqual(wn.sets[0], { reps: 9, done: false, warm: true });
+}
+
+// --- gym: split types to choose from, and "I'll add my own exercises" ---
+{
+  const names = s => s.map(t => `${t.name}:${t.days.join('')}`);
+  assert.deepStrictEqual(names(L.suggestSplit({ type: 'ap', perWeek: 4, minutes: 60 })), ['Anterior:03', 'Posterior:14']);
+  assert.deepStrictEqual(names(L.suggestSplit({ type: 'arnold', perWeek: 3, minutes: 60 })), ['Chest & back:0', 'Shoulders & arms:2', 'Legs:4']);
+  assert.deepStrictEqual(names(L.suggestSplit({ type: 'ulppl', perWeek: 5, minutes: 60 })), ['Upper:0', 'Lower:1', 'Push:2', 'Pull:3', 'Legs:4']);
+  assert.deepStrictEqual(names(L.suggestSplit({ type: 'fbeod', perWeek: 4, minutes: 60 })), ['Full body A:04', 'Full body B:26']); // every other day
+  assert.deepStrictEqual(names(L.suggestSplit({ type: 'fb', perWeek: 3, minutes: 60 })), ['Full body A:04', 'Full body B:2']);
+  assert.deepStrictEqual(L.suggestSplit({ type: 'ppl', perWeek: 4, minutes: 60 }), []);              // PPL is 3 or 6 a week
+  for (const [k, T] of Object.entries(L.SPLIT_TYPES)) for (const n of Object.keys(T.seq))
+    assert.ok(L.suggestSplit({ type: k, perWeek: Number(n), minutes: 60 }).every(t => t.items.length >= 3), k + n);
+  const own = L.suggestSplit({ type: 'ul', perWeek: 4, minutes: 60, own: true });
+  assert.deepStrictEqual(own, [{ name: 'Upper', days: [0, 3], items: [] }, { name: 'Lower', days: [1, 4], items: [] }]); // no style: My week asks sets
+  const d = data([daily()]);
+  L.applySplit(d, own, T, 5);
+  assert.ok(d.gym.templates.every(t => !t.items.length && t.style === undefined) && L.validate(d));
 }
 
 // --- exercise library (exercises.js) ---

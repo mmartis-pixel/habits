@@ -141,15 +141,37 @@
     lower: { compound: ['squat', 'romanian-deadlift', 'leg-press', 'walking-lunge', 'hip-thrust'], isolation: ['leg-curl', 'leg-extension', 'calf-raise', 'plank'] },
     full: { compound: ['squat', 'bench-press', 'barbell-row', 'overhead-press', 'romanian-deadlift', 'pull-up'], isolation: ['lateral-raise', 'biceps-curl', 'triceps-pushdown', 'plank'] },
   };
-  const SPLITS = { 2: ['Full body A', 'Full body B'], 3: ['Push', 'Pull', 'Legs'], 4: ['Upper', 'Lower', 'Upper', 'Lower'],
-    5: ['Push', 'Pull', 'Legs', 'Upper', 'Lower'], 6: ['Push', 'Pull', 'Legs', 'Push', 'Pull', 'Legs'] };
-  const SPLIT_TYPE = { 'Full body A': 'full', 'Full body B': 'full', Push: 'push', Pull: 'pull', Legs: 'legs', Upper: 'upper', Lower: 'lower' };
+  Object.assign(SPLIT_KEYS, {
+    anterior: { compound: ['squat', 'bench-press', 'overhead-press', 'leg-press', 'incline-dumbbell-press', 'walking-lunge'], isolation: ['leg-extension', 'lateral-raise', 'biceps-curl', 'cable-fly', 'plank'] },
+    posterior: { compound: ['deadlift', 'pull-up', 'romanian-deadlift', 'barbell-row', 'hip-thrust', 'seated-cable-row'], isolation: ['leg-curl', 'face-pull', 'triceps-pushdown', 'calf-raise', 'rear-delt-fly'] },
+    chestback: { compound: ['bench-press', 'pull-up', 'incline-dumbbell-press', 'barbell-row', 'dips', 'lat-pulldown'], isolation: ['cable-fly', 'straight-arm-pulldown', 'face-pull', 'pec-deck'] },
+    shoulderarms: { compound: ['overhead-press', 'close-grip-bench-press', 'upright-row'], isolation: ['lateral-raise', 'biceps-curl', 'triceps-pushdown', 'hammer-curl', 'rear-delt-fly', 'overhead-triceps-extension'] },
+  });
+  // split types to pick from; each lists the workout order for the times a week it supports
+  const FB = ['Full body A', 'Full body B'], UL = ['Upper', 'Lower'], PPL = ['Push', 'Pull', 'Legs'], AP = ['Anterior', 'Posterior'], ARN = ['Chest & back', 'Shoulders & arms', 'Legs'];
+  const SPLIT_TYPES = {
+    fb: { name: 'Full body', seq: { 2: FB, 3: [...FB, FB[0]] } },
+    fbeod: { name: 'Full body every other day', seq: { 3: [...FB, FB[0]], 4: [...FB, ...FB] }, days: { 3: [0, 2, 4], 4: [0, 2, 4, 6] } },
+    ul: { name: 'Upper / Lower', seq: { 2: UL, 4: [...UL, ...UL] } },
+    ppl: { name: 'Push / Pull / Legs', seq: { 3: PPL, 6: [...PPL, ...PPL] } },
+    ulppl: { name: 'Upper / Lower + PPL', seq: { 5: [...UL, ...PPL] } },
+    ap: { name: 'Anterior / Posterior', seq: { 2: AP, 4: [...AP, ...AP] } },
+    arnold: { name: 'Arnold split', seq: { 3: ARN, 6: [...ARN, ...ARN] } },
+  };
+  const DEFAULT_TYPE = { 2: 'fb', 3: 'ppl', 4: 'ul', 5: 'ulppl', 6: 'ppl' };
+  const SPLIT_TYPE = { 'Full body A': 'full', 'Full body B': 'full', Push: 'push', Pull: 'pull', Legs: 'legs', Upper: 'upper', Lower: 'lower',
+    Anterior: 'anterior', Posterior: 'posterior', 'Chest & back': 'chestback', 'Shoulders & arms': 'shoulderarms' };
   const PREF_DAYS = { 2: [0, 3], 3: [0, 2, 4], 4: [0, 1, 3, 4], 5: [0, 1, 2, 3, 4], 6: [0, 1, 2, 3, 4, 5] };
+  // the helper decides sets and warm-ups (the user's rule: compound lifts get more warm-ups than isolation)
+  function helperPlan(style, compound) {
+    if (style <= 1) return compound ? { sets: 3, warm: 3 } : { sets: 2, warm: 1 }; // strength
+    return compound ? { sets: 2, warm: 2 } : { sets: 2, warm: 1 };                // balanced / hypertrophy (1–2 working)
+  }
   // preferred weekdays; a day off moves to the nearest free unused day (later first). [] = not enough free days
-  function pickDays(perWeek, daysOff) {
+  function pickDays(perWeek, daysOff, pref = PREF_DAYS[perWeek]) {
     const free = [0, 1, 2, 3, 4, 5, 6].filter(d => !daysOff.includes(d)), out = [];
-    if (!PREF_DAYS[perWeek] || free.length < perWeek) return [];
-    for (const d of PREF_DAYS[perWeek]) {
+    if (!pref || free.length < perWeek) return [];
+    for (const d of pref) {
       if (free.includes(d) && !out.includes(d)) { out.push(d); continue; }
       for (let k = 1; k <= 6; k++) {
         const c = [d + k, d - k].find(x => x >= 0 && x <= 6 && free.includes(x) && !out.includes(x));
@@ -158,10 +180,17 @@
     }
     return out.sort((x, y) => x - y);
   }
-  // → [{ name, days, items: [{ lib }] }]; exercise count from session length and the style's sets × rest
-  function suggestSplit({ perWeek, daysOff = [], minutes, style = 2 }) {
-    const days = pickDays(perWeek, daysOff), seq = SPLITS[perWeek];
+  // → [{ name, days, style, items: [{ lib, sets, warm }] }]; exercise count from session length and the style's sets × rest.
+  // own = the user picks the exercises: empty workouts, no style (My week then asks sets / warm-ups per exercise)
+  function suggestSplit({ type, perWeek, daysOff = [], minutes, style = 2, own = false }) {
+    const T = SPLIT_TYPES[type || DEFAULT_TYPE[perWeek]], seq = T && T.seq[perWeek];
+    const days = seq ? pickDays(perWeek, daysOff, (T.days && T.days[perWeek]) || PREF_DAYS[perWeek]) : [];
     if (days.length !== perWeek || !seq) return [];
+    if (own) {
+      const out = [];
+      seq.forEach((name, i) => { let t = out.find(x => x.name === name); if (!t) out.push(t = { name, days: [], items: [] }); t.days.push(days[i]); });
+      return out;
+    }
     const st = STYLES[style] || STYLES[2], per = 2 + st.setsN * (st.restMin + 1);
     const n = Math.max(3, Math.min(8, Math.floor((minutes - 5) / per))), out = [];
     seq.forEach((name, i) => {
@@ -170,8 +199,7 @@
         const k = SPLIT_KEYS[SPLIT_TYPE[name]];
         const comp = name === 'Full body B' ? [...k.compound.slice(3), ...k.compound.slice(0, 3)] : k.compound;
         const order = style <= 1 ? [...comp, ...k.isolation] : [...comp.slice(0, 2), ...k.isolation, ...comp.slice(2)];
-        // the style's working sets; 2 warm-ups on the first two compound lifts
-        t = { name, days: [], style, items: order.slice(0, n).map((lib, j) => ({ lib, sets: st.setsN, warm: j < 2 ? 2 : 0 })) };
+        t = { name, days: [], style, items: order.slice(0, n).map(lib => ({ lib, ...helperPlan(style, k.compound.includes(lib)) })) };
         out.push(t);
       }
       t.days.push(days[i]);
@@ -260,6 +288,16 @@
     if (warm) row.warm = true;
     return row;
   }
+  // warm-up n (0-based) from the top working weight, the user's rule: 50–60% × 8–10, 66–75% × 5–7, 80–90% × 3–5 (4th: 90% × 2)
+  const WARM_STEPS = [[0.55, 9], [0.7, 6], [0.85, 4], [0.9, 2]];
+  // top weight: the heaviest working kg typed in this workout, else last time's heaviest working set
+  function warmRow(data, it, n, excludeId) {
+    const kgs = rows => rows.filter(s => !s.warm && typeof s.kg === 'number').map(s => s.kg);
+    const now = kgs(it.sets), last = kgs(lastSets(data, it.ex, excludeId) || []), top = Math.max(0, ...(now.length ? now : last));
+    const [pct, reps] = WARM_STEPS[Math.min(n, WARM_STEPS.length - 1)], row = { reps, done: false, warm: true };
+    if (top) row.kg = Math.round(top * pct / 2.5) * 2.5; // ponytail: plates in 2.5 kg steps; light dumbbells may want 1 kg steps
+    return row;
+  }
   // a workout exercise starts with one working set; its plan says how many set / warm-up chips it gets.
   // Added mid-workout (no template): 3 sets, 2 warm-ups.
   const workoutItem = (data, exId, plan = { sets: 3, warm: 2 }) => ({ ex: exId, plan, sets: [prefillRow(data, exId, false, 0)] });
@@ -269,7 +307,7 @@
     if (!it) return;
     const rows = it.sets.filter(s => !!s.warm === warm), other = it.sets.filter(s => !!s.warm !== warm);
     n = Math.max(warm ? 0 : 1, n);
-    while (rows.length < n) rows.push(prefillRow(data, it.ex, warm, rows.length, w.id));
+    while (rows.length < n) rows.push(warm ? warmRow(data, it, rows.length, w.id) : prefillRow(data, it.ex, false, rows.length, w.id));
     while (rows.length > n && !rows[rows.length - 1].done) rows.pop();
     it.sets = warm ? [...rows, ...other] : [...other, ...rows];
     w.updated = now;
@@ -536,7 +574,7 @@
     return out;
   }
 
-  const api = { gymOf, mergeGym, deleteGym, STYLES, styleOf, SPLIT_KEYS, suggestSplit, applySplit, ensureExercise, setDayWorkout, linkWorkoutHabit, todayTemplate, lastSets, planOf, workoutItem, setRowCount, startWorkout, bestKg, finishWorkout, exerciseHistory, reminderText, reminderPlan, REMIND_HOURS, dayKey, addDays, weekStart, dow, isScheduled, isDone, isPaused, toggle, togglePause, merge, deleteHabit, weekCount, isDue, dayScore, isPerfect, perfectStreak,
+  const api = { gymOf, mergeGym, deleteGym, STYLES, styleOf, SPLIT_KEYS, suggestSplit, applySplit, ensureExercise, setDayWorkout, linkWorkoutHabit, todayTemplate, lastSets, planOf, helperPlan, SPLIT_TYPES, workoutItem, setRowCount, startWorkout, bestKg, finishWorkout, exerciseHistory, reminderText, reminderPlan, REMIND_HOURS, dayKey, addDays, weekStart, dow, isScheduled, isDone, isPaused, toggle, togglePause, merge, deleteHabit, weekCount, isDue, dayScore, isPerfect, perfectStreak,
     streak, bestStreak, percent, percentBetween, monthStats, cellStatus, weakDay, validate, newId, defaultData };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.HabitLogic = api;
