@@ -132,21 +132,21 @@
   const count = (x, lo, hi, d) => (Number.isInteger(x) && x >= lo && x <= hi ? x : d);
   const planOf = i => ({ sets: count(i && i.sets, 1, 8, 3), warm: count(i && i.warm, 0, 4, 0) });
 
-  // ---- split helper: proven splits, no AI, no reps. Library keys (exercises.js has names and pictures). ----
+  // ---- split helper: proven splits, no AI. Library keys (exercises.js has names and pictures). ----
+  // Picked from the user's own list (2026-11-28) and well-known lifts that are easy to learn: machines, cables and
+  // dumbbells first; no barbell squat, deadlift, pull-up or barbell row. compound = gets more warm-ups (helperPlan).
   const SPLIT_KEYS = {
-    push: { compound: ['bench-press', 'overhead-press', 'incline-dumbbell-press', 'dips'], isolation: ['lateral-raise', 'triceps-pushdown', 'cable-fly', 'overhead-triceps-extension'] },
-    pull: { compound: ['deadlift', 'pull-up', 'barbell-row', 'lat-pulldown', 'seated-cable-row'], isolation: ['face-pull', 'biceps-curl', 'hammer-curl', 'rear-delt-fly'] },
-    legs: { compound: ['squat', 'romanian-deadlift', 'leg-press', 'walking-lunge', 'hip-thrust'], isolation: ['leg-curl', 'leg-extension', 'calf-raise', 'hanging-leg-raise'] },
-    upper: { compound: ['bench-press', 'barbell-row', 'overhead-press', 'pull-up', 'incline-dumbbell-press'], isolation: ['lateral-raise', 'biceps-curl', 'triceps-pushdown', 'face-pull'] },
-    lower: { compound: ['squat', 'romanian-deadlift', 'leg-press', 'walking-lunge', 'hip-thrust'], isolation: ['leg-curl', 'leg-extension', 'calf-raise', 'plank'] },
-    full: { compound: ['squat', 'bench-press', 'barbell-row', 'overhead-press', 'romanian-deadlift', 'pull-up'], isolation: ['lateral-raise', 'biceps-curl', 'triceps-pushdown', 'plank'] },
+    push: { compound: ['machine-chest-press', 'incline-dumbbell-press', 'dumbbell-shoulder-press', 'dips'], isolation: ['lateral-raise', 'pec-deck', 'triceps-pushdown', 'overhead-triceps-extension'] },
+    pull: { compound: ['lat-pulldown', 'seated-cable-row', 'one-arm-dumbbell-row', 'wide-grip-cable-row'], isolation: ['reverse-pec-deck', 'preacher-curl', 'bayesian-curl', 'shrug', 'reverse-curl'] },
+    legs: { compound: ['hack-squat', 'leg-press', 'romanian-deadlift', 'hip-thrust'], isolation: ['leg-curl', 'leg-extension', 'calf-raise', 'hip-adduction', 'cable-crunch'] },
+    upper: { compound: ['machine-chest-press', 'lat-pulldown', 'incline-dumbbell-press', 'seated-cable-row', 'dumbbell-shoulder-press'], isolation: ['lateral-raise', 'triceps-pushdown', 'preacher-curl', 'reverse-pec-deck', 'pec-deck'] },
+    lower: { compound: ['hack-squat', 'romanian-deadlift', 'leg-press', 'hip-thrust'], isolation: ['leg-curl', 'leg-extension', 'calf-raise', 'hip-adduction', 'cable-crunch'] },
+    full: { compound: ['leg-press', 'machine-chest-press', 'lat-pulldown', 'romanian-deadlift', 'dumbbell-shoulder-press', 'seated-cable-row'], isolation: ['lateral-raise', 'leg-curl', 'triceps-pushdown', 'preacher-curl', 'cable-crunch'] },
+    anterior: { compound: ['hack-squat', 'machine-chest-press', 'incline-dumbbell-press', 'dumbbell-shoulder-press', 'leg-press'], isolation: ['leg-extension', 'lateral-raise', 'pec-deck', 'preacher-curl', 'cable-crunch'] },
+    posterior: { compound: ['romanian-deadlift', 'lat-pulldown', 'seated-cable-row', 'hip-thrust', 'wide-grip-cable-row'], isolation: ['leg-curl', 'reverse-pec-deck', 'triceps-pushdown', 'calf-raise', 'shrug'] },
+    chestback: { compound: ['machine-chest-press', 'lat-pulldown', 'incline-dumbbell-press', 'seated-cable-row', 'dips', 'wide-grip-cable-row'], isolation: ['pec-deck', 'reverse-pec-deck', 'straight-arm-pulldown'] },
+    shoulderarms: { compound: ['dumbbell-shoulder-press', 'dips'], isolation: ['lateral-raise', 'preacher-curl', 'triceps-pushdown', 'reverse-pec-deck', 'bayesian-curl', 'overhead-triceps-extension', 'shrug', 'reverse-curl'] },
   };
-  Object.assign(SPLIT_KEYS, {
-    anterior: { compound: ['squat', 'bench-press', 'overhead-press', 'leg-press', 'incline-dumbbell-press', 'walking-lunge'], isolation: ['leg-extension', 'lateral-raise', 'biceps-curl', 'cable-fly', 'plank'] },
-    posterior: { compound: ['deadlift', 'pull-up', 'romanian-deadlift', 'barbell-row', 'hip-thrust', 'seated-cable-row'], isolation: ['leg-curl', 'face-pull', 'triceps-pushdown', 'calf-raise', 'rear-delt-fly'] },
-    chestback: { compound: ['bench-press', 'pull-up', 'incline-dumbbell-press', 'barbell-row', 'dips', 'lat-pulldown'], isolation: ['cable-fly', 'straight-arm-pulldown', 'face-pull', 'pec-deck'] },
-    shoulderarms: { compound: ['overhead-press', 'close-grip-bench-press', 'upright-row'], isolation: ['lateral-raise', 'biceps-curl', 'triceps-pushdown', 'hammer-curl', 'rear-delt-fly', 'overhead-triceps-extension'] },
-  });
   // split types to pick from; each lists the workout order for the times a week it supports
   const FB = ['Full body A', 'Full body B'], UL = ['Upper', 'Lower'], PPL = ['Push', 'Pull', 'Legs'], AP = ['Anterior', 'Posterior'], ARN = ['Chest & back', 'Shoulders & arms', 'Legs'];
   const SPLIT_TYPES = {

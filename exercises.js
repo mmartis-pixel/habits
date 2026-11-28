@@ -295,7 +295,7 @@
       S('Bar at the thighs, hands shoulder-width', st({ arm: 270, fore: 270, hi: { arm: 'main', torso: 'help' }, gear: J => [plate(J.hand, 9)] })),
       S('Pull up along the body, elbows lead', st({ arm: 320, fore: 240, hi: { arm: 'main', torso: 'help' }, gear: J => [plate(J.hand, 9)] })),
       S('Elbows at shoulder height, lower slowly', st({ arm: 0, fore: 200, hi: { arm: 'main', torso: 'help' }, gear: J => [plate(J.hand, 9)] })) ] },
-    { key: 'shrug', name: 'Shrug', group: 'Shoulders', compound: false, muscles: { main: ['TRAPEZIUS'], help: ['FOREARM'] }, steps: [
+    { key: 'shrug', name: 'Shrug', group: 'Back', compound: false, muscles: { main: ['TRAPEZIUS'], help: ['FOREARM'] }, steps: [
       S('Dumbbells at your sides, arms long', st({ arm: 270, fore: 270, hi: { torso: 'main' }, gear: J => [bell(J.hand)] })),
       S('Lift the shoulders straight up', st({ arm: 270, fore: 270, len: { torso: 40.5 }, hi: { torso: 'main' }, gear: J => [bell(J.hand)] })),
       S('Hold at the top, lower slowly', st({ arm: 270, fore: 270, len: { torso: 42 }, hi: { torso: 'main' }, gear: J => [bell(J.hand)] })) ] },
@@ -390,19 +390,28 @@
     { key: 'pallof-press', name: 'Pallof press', group: 'Core', compound: false, muscles: { main: ['OBLIQUES', 'ABS'], help: [] }, steps: [
       S('Side-on to the cable, handle at the chest', pallof(250, 15)), S('Press straight out, do not let it turn you', pallof(320, 5)),
       S('Hold with arms long, bring it back slowly', pallof(355, 0)) ] },
+    // ---- v3.1: from the user's own exercise list ----
+    { key: 'bayesian-curl', name: 'Bayesian curl', group: 'Arms', compound: false, like: 'biceps-curl', muscles: { main: ['BICEPS'], help: ['FOREARM'] },
+      caps: ['Face away from a low cable, arm behind you', 'Curl forward, the elbow stays back', 'Squeeze at the top, lower slowly'] },
+    { key: 'wide-grip-cable-row', name: 'Wide-grip cable row', group: 'Back', compound: true, like: 'seated-cable-row', muscles: { main: ['UPPER_BACK', 'BACK_DELTOIDS'], help: ['BICEPS', 'TRAPEZIUS'] },
+      caps: ['Wide bar, sit tall, arms long', 'Pull to the upper belly, elbows out', 'Squeeze the upper back, reach forward slowly'] },
+    { key: 'reverse-pec-deck', name: 'Reverse pec deck', group: 'Shoulders', compound: false, like: 'cable-fly', reverse: true, muscles: { main: ['BACK_DELTOIDS'], help: ['UPPER_BACK', 'TRAPEZIUS'] },
+      caps: ['Chest to the pad, arms in front at shoulder height', 'Open the arms out wide', 'Squeeze the rear shoulders, return slowly'] },
+    { key: 'hip-adduction', name: 'Hip adduction machine', group: 'Legs', compound: false, muscles: { main: ['ADDUCTORS'], help: [] }, steps: [
+      S('Sit tall, pads on the inside of the knees', abd(85)), S('Squeeze the knees together', abd(60)), S('Pause, then open slowly', abd(30)) ] },
   ];
   // groups and their subgroups; a group without subgroups lists its own exercises
   const GROUPS = [{ name: 'Chest' }, { name: 'Back', subs: ['Lats & upper back', 'Lower back'] }, { name: 'Shoulders' },
     { name: 'Arms', subs: ['Biceps', 'Triceps', 'Forearms'] }, { name: 'Legs', subs: ['Quads', 'Hamstrings', 'Glutes', 'Calves'] }, { name: 'Core', subs: ['Abs', 'Obliques'] }];
   const SUB = {
-    'Lats & upper back': 'pull-up chin-up lat-pulldown barbell-row one-arm-dumbbell-row seated-cable-row t-bar-row straight-arm-pulldown',
+    'Lats & upper back': 'pull-up chin-up lat-pulldown barbell-row one-arm-dumbbell-row seated-cable-row t-bar-row straight-arm-pulldown wide-grip-cable-row shrug',
     'Lower back': 'deadlift back-extension good-morning superman rack-pull',
-    Biceps: 'biceps-curl hammer-curl ez-bar-curl cable-curl preacher-curl concentration-curl',
+    Biceps: 'biceps-curl hammer-curl ez-bar-curl cable-curl preacher-curl concentration-curl bayesian-curl',
     Triceps: 'triceps-pushdown rope-pushdown skull-crusher overhead-triceps-extension close-grip-bench-press diamond-push-up triceps-kickback',
     Forearms: 'wrist-curl reverse-wrist-curl reverse-curl farmers-walk dead-hang',
     Quads: 'squat front-squat goblet-squat hack-squat leg-press leg-extension walking-lunge bulgarian-split-squat',
     Hamstrings: 'romanian-deadlift stiff-leg-deadlift single-leg-rdl leg-curl seated-leg-curl nordic-curl',
-    Glutes: 'hip-thrust glute-bridge cable-kickback step-up sumo-deadlift hip-abduction',
+    Glutes: 'hip-thrust glute-bridge cable-kickback step-up sumo-deadlift hip-abduction hip-adduction',
     Calves: 'calf-raise single-leg-calf-raise seated-calf-raise leg-press-calf-raise donkey-calf-raise',
     Abs: 'plank crunch hanging-leg-raise cable-crunch ab-wheel-rollout dead-bug reverse-crunch lying-leg-raise',
     Obliques: 'russian-twist side-plank woodchopper bicycle-crunch pallof-press',
@@ -410,8 +419,8 @@
   const byKey = key => LIST.find(e => e.key === key) || null;
   for (const [sub, keys] of Object.entries(SUB)) for (const k of keys.split(' ')) byKey(k).sub = sub;
   const find = name => { const n = String(name || '').trim().toLowerCase(); return LIST.find(e => e.name.toLowerCase() === n) || null; };
-  // `like` reuses another entry's pictures; `caps` can replace its captions
-  const stepsOf = e => { const base = e.steps || byKey(e.like).steps; return base.map((s, i) => ({ cap: (e.caps && e.caps[i]) || s.cap, pose: s.pose })); };
+  // `like` reuses another entry's pictures; `caps` can replace its captions (reverse: the same pictures played the opposite way)
+  const stepsOf = e => { const like = e.steps || byKey(e.like).steps, base = e.reverse ? [...like].reverse() : like; return base.map((s, i) => ({ cap: (e.caps && e.caps[i]) || s.cap, pose: s.pose })); };
   const CREDIT = 'Muscle map: body-highlighter (MIT)';
 
   // animated mannequin: moves pose 1 → 2 → 3, holds, and back (SMIL: offline, no script). Every pose of an
