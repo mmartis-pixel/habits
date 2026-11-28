@@ -714,6 +714,13 @@ async function signIn(credential) {
     const r = await api('/auth/google', { credential });
     sync = { session: r.session, email: r.email, uid: r.uid };
     localStorage.setItem(SYNC_KEY, JSON.stringify(sync));
+    // both this device and the account have data, and the device has something the account doesn't: ask which wins
+    const remote = await api('/sync/pull'), acct = remote.data && L.validate(remote.data) ? remote.data : null;
+    const hasData = d => !!(d.habits.length || Object.keys(d.log).length || (d.gym && ((d.gym.templates || []).length || (d.gym.workouts || []).length)));
+    if (acct && hasData(acct) && hasData(data) && JSON.stringify(L.merge(data, acct)) !== JSON.stringify(L.merge(acct, acct))) {
+      const useAccount = await new Promise(res => { signinChoice = res; ask = 'signin'; render(); });
+      if (useAccount) { data = acct; persist(); }
+    }
     await syncNow(); // this device's habits + the account's habits, merged
     if (onboard) finishOnboarding();
     if (wasEmpty && data.habits.length) tab = 'today'; // new device: straight to the synced habits
@@ -1940,7 +1947,8 @@ const notifyOn = () => !!(ui.reminder && ui.reminder.on) && (NATIVE || Notificat
 const wantsNotify = () => canRemind() && !notifyOn() && (NATIVE || Notification.permission !== 'denied'); // the app has no web Notification API
 // install is offered whenever OLYX runs in a browser tab; without Chrome's prompt the window shows how to do it by hand
 const wantsInstall = () => !standalone();
-let ask = null; // 'notify' | 'install'
+let ask = null; // 'notify' | 'install' | 'signin'
+let signinChoice = null; // resolves the sign-in question: true = use the account's data, false = keep both
 function pickAsk() {
   if (ask || onboard) return;
   if (wantsNotify() && !ui.notifyNo) ask = 'notify';
@@ -1949,6 +1957,15 @@ function pickAsk() {
 // a home-screen *shortcut* (not a real install) shows Chrome's "Tap to copy the URL for this app" notification while open
 const INSTALL_STEPS = 'In Chrome tap <b>⋮</b> → <b>Install app</b>. If you only see <b>Add to Home screen</b>, tap it and choose <b>Install</b>, not "Create shortcut".';
 function askModal() {
+  if (ask === 'signin') return `<div class="backdrop"></div>
+    <div class="sheet amodal" role="dialog" aria-modal="true" aria-label="Your account already has data">
+      <div class="am-ico">${LOGO}</div>
+      <h3>Your account already has data</h3>
+      <p>This device has changes that are not in your account, for example a workout made while signed out.</p>
+      <button class="btn primary" data-act="ask-account">Use my account's data</button>
+      <button class="btn" data-act="ask-merge">Keep both</button>
+      <p class="muted">"Use my account's data" drops this device's changes.</p>
+    </div>`;
   const notify = ask === 'notify';
   return `<div class="backdrop"></div>
     <div class="sheet amodal" role="dialog" aria-modal="true" aria-label="${notify ? 'Notifications' : 'Install OLYX'}">
@@ -2064,6 +2081,7 @@ document.addEventListener('click', ev => {
     case 'install': installApp(); return;
     case 'gnative': nativeGoogle(); return;
     case 'ask-x': dismissAsk(); break;
+    case 'ask-account': case 'ask-merge': { const done = signinChoice; signinChoice = null; ask = null; if (done) done(b.dataset.act === 'ask-account'); break; }
     case 'ask-yes': { const was = ask; ask = null; if (was === 'notify') { ui.notifyNo = true; saveUi(); enableReminder().then(() => { pickAsk(); render(); }); } else { ui.installNo = true; saveUi(); installApp(); } break; }
     case 'ask-notify': enableReminder(); return;
     case 'install-ask': if (installEvt) { installApp(); return; } ask = 'install'; break;
